@@ -1,4 +1,4 @@
--- Input file for Poisson bracket operator
+-- Input file for ELM pulse problem
 
 -- polynomial order
 polyOrder = 2
@@ -7,12 +7,16 @@ polyOrder = 2
 cfl = 0.1
 
 -- physical constants
+-- eletron mass (kg)
+electronMass = 9.10938215e-31
 -- electron volt to joules
 eV = 1.602e-19
 -- Deuterium ion mass (kg)
 ionMass = 2.014*1.66e-27
 -- signed ion charge
 ionCharge = eV
+-- permittivity of free space (F/m)
+epsilon0 = 8.85418782e-12;
 
 -- physical input parameters
 
@@ -30,7 +34,7 @@ lSource = 25
 A = 1.2
 
 -- Derived parameters
-nMidplane = nPed;
+nMidplane = nPed/5;
 -- Thermal velocity of pedestal
 vtPed = math.sqrt(tPed*eV/ionMass)
 -- Pedestal sound speed (m/s)
@@ -44,7 +48,7 @@ VL, VU = -6.0*vtPed, 6.0*vtPed
 -- number of cells
 NX, NV = 16, 64
 
--- initial ion temperature
+-- initial elm ion source temperature
 ionTemp = tPed
 
 -- L-B coefficient
@@ -178,7 +182,7 @@ initDistf = Updater.EvalOnNodes2D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(x,y,z,t)
-		 return nMidplane*maxwellian(math.sqrt(250*eV/ionMass), 0.0, x, y)
+		 return nMidplane*maxwellian(math.sqrt(125*eV/ionMass), 0.0, x, y)
 	      end
 }
 initDistf:setOut( {distf} )
@@ -235,6 +239,12 @@ lbDragSlvr = Updater.LenardBernsteinDragUpdater2D {
   diffusionCoeff = lbAlpha,
   -- onlyIncrement is true
   onlyIncrement = true,
+  -- use braginskii coeff instead of lbAlpha?
+  useBraginskii = true,
+  -- required if useBraginskii = true
+  ionMass = ionMass,
+  elementaryCharge = eV,
+  epsilon0 = epsilon0,
 }
 
 -- updater for L-B drag term
@@ -248,6 +258,12 @@ lbDiffSlvr = Updater.LenardBernsteinDiffUpdater2D {
   diffusionCoeff = lbAlpha,
   -- onlyIncrement is true
   onlyIncrement = true,
+  -- use braginskii coeff instead of lbAlpha?
+  useBraginskii = true,
+  -- required if useBraginskii = true
+  ionMass = ionMass,
+  elementaryCharge = eV,
+  epsilon0 = epsilon0,
 }
 
 -- spatial grid
@@ -289,6 +305,26 @@ vThermSq:clear(0.0)
 -- Ion Temperature Profile
 tempProfile = DataStruct.Field1D {
    onGrid = grid_1d,
+   -- numNodesPerCell is number of global nodes stored in each cell
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+
+-- field to store continous potential in 1D
+phi1d = DataStruct.Field1D {
+   onGrid = grid_1d,
+   -- numNodesPerCell is number of global nodes stored in each cell
+   numComponents = 1*numCgNodesPerCell_1d,
+   -- ghost cells
+   ghost = {1, 1},
+   -- write ghosts
+   writeGhost = {0, 1},
+}
+
+-- field to store discontinous potential in 1D
+phi1dDiscont = DataStruct.Field1D {
+   onGrid = grid_1d,
+   location = "vertex",
    -- numNodesPerCell is number of global nodes stored in each cell
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
@@ -437,12 +473,13 @@ heatFluxAtEdgeCalc = Updater.HeatFluxAtEdgeUpdater {
    -- basis functions to use
    basis = basis_1d,
    -- are common nodes shared?
-   shareCommonNodes = false, -- for DG fields common nodes not shared
+   shareCommonNodes = false,
    ionMass = ionMass,
+   elementaryCharge = eV,
 }
 
 -- set input field
-heatFluxAtEdgeCalc:setIn( {firstMoment, thirdMoment, vThermSq} )
+heatFluxAtEdgeCalc:setIn( {firstMoment, thirdMoment, vThermSq, phi1dDiscont} )
 -- set output dynvector
 heatFluxAtEdgeCalc:setOut( {heatFluxAtEdge} )
 
@@ -493,26 +530,6 @@ function calcMoments(curr, dt, distfIn)
    calcThirdMoment(curr, dt, distfIn, thirdMoment)
 end
 
--- field to store continous potential in 1D
-phi1d = DataStruct.Field1D {
-   onGrid = grid_1d,
-   -- numNodesPerCell is number of global nodes stored in each cell
-   numComponents = 1*numCgNodesPerCell_1d,
-   -- ghost cells
-   ghost = {1, 1},
-   -- write ghosts
-   writeGhost = {0, 1},
-}
-
--- field to store discontinous potential in 1D
-phi1dDiscont = DataStruct.Field1D {
-   onGrid = grid_1d,
-   location = "vertex",
-   -- numNodesPerCell is number of global nodes stored in each cell
-   numComponents = basis_1d:numNodes(),
-   ghost = {1, 1},
-}
-
 -- updater to copy 1D field to 2D field
 copyTo2D = Updater.Copy1DTo2DNodalField {
    -- grid for updater
@@ -534,6 +551,10 @@ phiFromNumDensityCalc = Updater.BoltzmannPhiUpdater {
    onGrid = grid_1d,
    -- basis functions to use
    basis = basis_1d,
+   -- required physical parameters
+   electronMass = electronMass,
+   ionMass = ionMass,
+   elementaryCharge = eV,
 }
 
 -- updater to move phi to continuous field
@@ -622,26 +643,26 @@ function poissonBracket(curr, dt, distfIn, hamilIn, distfOut)
 end
 
 -- update L-B drag operator
-function solveDrag(curr, dt, distfIn, uIn, distfOut)
+function solveDrag(curr, dt, distfIn, uIn, vThermSqIn, numDensityIn, distfOut)
    lbDragSlvr:setCurrTime(curr)
-   lbDragSlvr:setIn( {distfIn, uIn} )
+   lbDragSlvr:setIn( {distfIn, uIn, vThermSqIn, numDensityIn} )
    lbDragSlvr:setOut( {distfOut} )
    return lbDragSlvr:advance(curr+dt)
 end
 
 -- update L-B diffusion operator
-function solveDiff(curr, dt, distfIn, vThermSqIn, distfOut)
+function solveDiff(curr, dt, distfIn, vThermSqIn, numDensityIn, distfOut)
    lbDiffSlvr:setCurrTime(curr)
-   lbDiffSlvr:setIn( {distfIn, vThermSqIn} )
+   lbDiffSlvr:setIn( {distfIn, vThermSqIn, numDensityIn} )
    lbDiffSlvr:setOut( {distfOut} )
    return lbDiffSlvr:advance(curr+dt)
 end
 
 -- compute phi from number density and thermal velocity
-function calcPhiFromNumDensity(curr, dt, numDensIn, vtSqIn, phiOut)
+function calcPhiFromNumDensity(curr, dt, numDensIn, vtSqIn, mom1In, phiOut)
    phiOut:clear(0.0)
    phiFromNumDensityCalc:setCurrTime(curr)
-   phiFromNumDensityCalc:setIn( {numDensIn, vtSqIn} )
+   phiFromNumDensityCalc:setIn( {numDensIn, mom1In, vtSqIn} )
    phiFromNumDensityCalc:setOut( {phiOut} )
    return phiFromNumDensityCalc:advance(curr+dt)
 end
@@ -664,8 +685,7 @@ end
 function calcHamiltonian(curr, dt, distIn, hamilOut)
    calcMoments(curr, dt, distIn)
    calcVelocitiesFromMoments(curr, dt)
-   calcPhiFromNumDensity(curr, dt, numDensity, vThermSq, phi1dDiscont)
-   phi1dDiscont:scale(ionMass/ionCharge)
+   calcPhiFromNumDensity(curr, dt, numDensity, vThermSq, firstMoment, phi1dDiscont)
    calcContinuousPhi(curr, dt, phi1dDiscont, phi1d)
 
    hamilOut:clear(0.0)
@@ -704,8 +724,8 @@ function rk3(tCurr, myDt)
 
    -- RK stage 1
    pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf, hamil, distf1)
-   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf, vThermSq, diffDistf1)
-   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf, driftU, dragDistf1)
+   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf, vThermSq, numDensity, diffDistf1)
+   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf, driftU, vThermSq, numDensity, dragDistf1)
 
    distf1:accumulate(myDt, diffDistf1)
    distf1:accumulate(myDt, dragDistf1)
@@ -722,8 +742,8 @@ function rk3(tCurr, myDt)
 
    -- RK stage 2
    pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf1, hamil, distfNew)
-   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, diffDistf1)
-   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, dragDistf1)
+   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, numDensity, diffDistf1)
+   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, vThermSq, numDensity, dragDistf1)
 
    distfNew:accumulate(myDt, diffDistf1)
    distfNew:accumulate(myDt, dragDistf1)
@@ -741,8 +761,8 @@ function rk3(tCurr, myDt)
 
    -- RK stage 3
    pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf1, hamil, distfNew)
-   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, diffDistf1)
-   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, dragDistf1)
+   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, numDensity, diffDistf1)
+   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, vThermSq, numDensity, dragDistf1)
    
    distfNew:accumulate(myDt, diffDistf1)
    distfNew:accumulate(myDt, dragDistf1)
@@ -802,7 +822,7 @@ end
 function writeFields(frame)
    --distf:write( string.format("distf_%d.h5", frame) )
    --numDensity:write( string.format("numDensity_%d.h5", frame) )
-   --phi1d:write( string.format("phi1d_%d.h5", frame) )
+   phi1dDiscont:write( string.format("phi1d_%d.h5", frame) )
    --hamil:write( string.format("hamil_%d.h5", frame) )
    --totalPtcl:write( string.format("totalPtcl_%d.h5", frame) )
    --totalPtclEnergy:write( string.format("totalPtclEnergy_%d.h5", frame) )
