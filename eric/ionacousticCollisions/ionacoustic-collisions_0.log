@@ -1,5 +1,5 @@
 ** Welcome to Lucee!
-Simulation started at time Wed Jul 17 13:06:42 2013
+Simulation started at time Thu Aug  1 12:26:41 2013
 
 Setting up object of type Grid::RectCart2D ...
 Setting up object of type NodalFiniteElement2D::SerendipityElement ...
@@ -40,7 +40,25 @@ Setting up object of type Updater::Copy1DTo2DNodalField ...
 Setting up object of type Updater::ContFromDisCont1D ...
 Setting up object of type DataStruct::DynVector ...
 Setting up object of type Updater::NormGrad1D ...
--- Advancing solution from 0 to 20
+-- Advancing solution from 0 to 2
 
-Simulation took 154.059 seconds and finished at time Wed Jul 17 13:09:18 2013
+-- Advancing solution from 2 to 4
+
+-- Advancing solution from 4 to 6
+
+-- Advancing solution from 6 to 8
+
+-- Advancing solution from 8 to 10
+
+-- Advancing solution from 10 to 12
+
+-- Advancing solution from 12 to 14
+
+-- Advancing solution from 14 to 16
+
+-- Advancing solution from 16 to 18
+
+-- Advancing solution from 18 to 20
+
+Simulation took 153.911 seconds and finished at time Thu Aug  1 12:29:21 2013
 

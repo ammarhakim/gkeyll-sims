@@ -8,15 +8,15 @@ cfl = 0.1
 
 -- physical constants
 -- eletron mass (kg)
-electronMass = 9.10938215e-31
+electronMass = Lucee.ElectronMass
 -- electron volt to joules
-eV = 1.602e-19
+eV = Lucee.ElementaryCharge
 -- Deuterium ion mass (kg)
-ionMass = 2.014*1.66e-27
+ionMass = 2.014*Lucee.ProtonMass
 -- signed ion charge
-ionCharge = eV
+ionCharge = Lucee.ElementaryCharge
 -- permittivity of free space (F/m)
-epsilon0 = 8.85418782e-12;
+epsilon0 = Lucee.Epsilon0;
 
 -- physical input parameters
 
@@ -57,7 +57,7 @@ lbAlpha = 0
 -- parameters to control time-stepping
 tStart = 0.0
 tEnd = 500e-6
-nFrames = 1
+nFrames = 5
 
 -- Determine number of global nodes per cell for use in creating CG
 -- fields. Note that this looks a bit odd as this not the number of
@@ -158,7 +158,7 @@ dragDistf1 = DataStruct.Field2D {
 hamil = DataStruct.Field2D {
    onGrid = grid,
    -- numNodesPerCell is number of global nodes stored in each cell
-   numComponents = 1*numCgNodesPerCell,
+   numComponents = numCgNodesPerCell,
    ghost = {1, 1},
    -- ghost cells to write
    writeGhost = {0, 1} -- write extra layer on right to get nodes
@@ -168,7 +168,7 @@ hamil = DataStruct.Field2D {
 hamilKE = DataStruct.Field2D {
    onGrid = grid,
    -- numNodesPerCell is number of global nodes stored in each cell
-   numComponents = 1*numCgNodesPerCell,
+   numComponents = numCgNodesPerCell,
    ghost = {1, 1},
    -- ghost cells to write
    writeGhost = {0, 1} -- write extra layer on right to get nodes
@@ -276,11 +276,9 @@ lbDragSlvr = Updater.LenardBernsteinDragUpdater2D {
   -- onlyIncrement is true
   onlyIncrement = true,
   -- use braginskii coeff instead of lbAlpha?
-  useBraginskii = true,
+  useBraginskii = false,
   -- required if useBraginskii = true
   ionMass = ionMass,
-  elementaryCharge = eV,
-  epsilon0 = epsilon0,
 }
 
 -- updater for L-B drag term
@@ -295,11 +293,9 @@ lbDiffSlvr = Updater.LenardBernsteinDiffUpdater2D {
   -- onlyIncrement is true
   onlyIncrement = true,
   -- use braginskii coeff instead of lbAlpha?
-  useBraginskii = true,
+  useBraginskii = false,
   -- required if useBraginskii = true
   ionMass = ionMass,
-  elementaryCharge = eV,
-  epsilon0 = epsilon0,
 }
 
 -- spatial grid
@@ -508,10 +504,9 @@ heatFluxAtEdgeCalc = Updater.HeatFluxAtEdgeUpdater {
    onGrid = grid_1d,
    -- basis functions to use
    basis = basis_1d,
-   -- are common nodes shared?
-   shareCommonNodes = false,
    ionMass = ionMass,
-   elementaryCharge = eV,
+   -- Perpendicular temperature of ions and electrons
+   tPerp = tPed,
 }
 
 -- set input field
@@ -567,9 +562,13 @@ function calcMoments(curr, dt, distfIn)
 end
 
 -- updater to copy 1D field to 2D field
-copyTo2D = Updater.Copy1DTo2DNodalField {
-   -- grid for updater
+copyTo2D = Updater.NodalCopyFaceToInteriorUpdater {
+   basis1d = basis_1d,
+   basis2d = basis,
    onGrid = grid,
+   -- 1D data lives along x-direction
+   dir = 1,
+   shareCommonNodes = true,
 }
 
 -- function to copy 1D field to 2D field
@@ -857,17 +856,16 @@ end
 -- write data to H5 files
 function writeFields(frame)
    distf:write( string.format("distf_%d.h5", frame) )
-   --numDensity:write( string.format("numDensity_%d.h5", frame) )
+   numDensity:write( string.format("numDensity_%d.h5", frame) )
    phi1dDiscont:write( string.format("phi1d_%d.h5", frame) )
    --hamil:write( string.format("hamil_%d.h5", frame) )
    --totalPtcl:write( string.format("totalPtcl_%d.h5", frame) )
    --totalPtclEnergy:write( string.format("totalPtclEnergy_%d.h5", frame) )
    --fieldEnergy:write( string.format("fieldEnergy_%d.h5", frame) )
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frame) )
-   --tempProfile:write( string.format("tempProfile_%d.h5", frame) )
-   --vThermSq:write( string.format("vThermSq_%d.h5", frame) )
+   tempProfile:write( string.format("tempProfile_%d.h5", frame) )
    driftU:write( string.format("driftU_%d.h5", frame) )
-   --firstMoment:write( string.format("mom1_%d.h5", frame) )
+   firstMoment:write( string.format("mom1_%d.h5", frame) )
    --numDensInCell:write( string.format("numDensInCell_%d.h5", frame) )
 end
 
