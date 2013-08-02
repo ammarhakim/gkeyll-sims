@@ -1,7 +1,7 @@
 -- Input file for SOL ELM pulse problem
 
 -- polynomial order
-polyOrder = 3
+polyOrder = 2
 
 -- cfl number to use
 cfl = 0.1
@@ -508,8 +508,15 @@ heatFluxAtEdgeCalc = Updater.HeatFluxAtEdgeUpdater {
    -- basis functions to use
    basis = basis_1d,
    ionMass = ionMass,
-   -- Perpendicular temperature of ions and electrons
+   -- Perpendicular temperature of ions (1) and electrons (2)
    tPerp = tPed,
+   tPerpProfile = function(t)
+     if t > 200e-6 then
+       return tPed, tPed
+     else
+       return tPed, tPed
+     end
+	 end
 }
 
 -- set input field
