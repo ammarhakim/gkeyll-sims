@@ -4,7 +4,7 @@
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.05
+cfl = 0.1
 
 -- wave-number
 knumber = 0.5
@@ -16,7 +16,7 @@ VL, VU = -6.0, 6.0
 NX, NV = 32, 32
 
 -- temperature ratio (T_i/T_e)
-Tratio = 1.0
+Tratio = 0.25
 
 -- ion temperature
 ionTemp = 1.0
