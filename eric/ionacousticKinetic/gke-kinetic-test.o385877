@@ -1,4 +1,0 @@
-Warning: no access to tty (Bad file descriptor).
-Thus no job control in this shell.
-/var/spool/torque/mom_priv/jobs/385877.isis.pppl.gov.SC: line 16: gkseropt: command not found
-pdsh@ellis041: ellis041: ssh exited with exit code 66
