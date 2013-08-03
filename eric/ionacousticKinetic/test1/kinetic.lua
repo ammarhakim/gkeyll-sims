@@ -14,7 +14,7 @@ knumber = 0.5
 -- initial number density in each cell
 initNumDens = 1.0
 -- temperature ratio (T_i/T_e)
-Tratio = 0.5
+Tratio = 0.25
 
 kPerpTimesRho = 0.2
 -- ion temperature
@@ -133,11 +133,9 @@ initDistfElc = Updater.EvalOnNodes2D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(x,y,z,t)
-		  local ionThermal = math.sqrt(ionTemp/ionMass)
       local alpha = 0.01 -- perturbation
 		  local k = knumber
-		  return ((1+alpha*math.cos(k*x))*maxwellian(initNumDens, ionDrift, ionThermal, y)
-		    + kPerpTimesRho^2*initNumDens)/(1+kPerpTimesRho^2)
+		  return ((1+alpha*math.cos(k*x))*maxwellian(initNumDens, elcDrift, vtElc, y) + kPerpTimesRho^2*initNumDens)/(1+kPerpTimesRho^2)
 	   end
 }
 runUpdater(initDistfElc, 0.0, 0.0, {}, {distfElc})

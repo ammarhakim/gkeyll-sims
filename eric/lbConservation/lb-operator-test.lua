@@ -1,4 +1,5 @@
 -- Input file for testing 1x1v L-B collision operator
+-- Mainly used to look at conservation properties
 
 -- polynomial order
 polyOrder = 2

@@ -1,4 +1,4 @@
--- Input file for ion acoustic wave problem with LB collisions added
+-- Input file for Poisson bracket operator
 
 -- polynomial order
 polyOrder = 2
@@ -29,12 +29,12 @@ ionMass = 1.0
 -- permittivity of free space
 epsilon0 = 1.0
 -- L-B coefficient
-lbAlpha = 0
+lbAlpha = 0.01
 
 -- parameters to control time-stepping
 tStart = 0.0
 tEnd = 20.0
-nFrames = 10
+nFrames = 1
 
 -- Determine number of global nodes per cell for use in creating CG
 -- fields. Note that this looks a bit odd as this not the number of
