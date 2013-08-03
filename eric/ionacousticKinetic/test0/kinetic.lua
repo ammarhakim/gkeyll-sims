@@ -1,4 +1,5 @@
 -- Input file for ion acoustic problem with kinetic ions and electrons
+-- Basic case
 
 -- polynomial order
 polyOrder = 2

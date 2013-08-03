@@ -1,10 +1,10 @@
--- Input file for ion acoustic wave problem with LB collisions added
+-- Input file for Poisson bracket operator
 
 -- polynomial order
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.1
+cfl = 0.05
 
 -- wave-number
 knumber = 0.5
@@ -33,8 +33,8 @@ lbAlpha = 0
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 20.0
-nFrames = 10
+tEnd = 100.0
+nFrames = 1
 
 -- Determine number of global nodes per cell for use in creating CG
 -- fields. Note that this looks a bit odd as this not the number of

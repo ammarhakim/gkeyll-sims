@@ -1,4 +1,5 @@
 -- Input file for SOL ELM pulse problem
+-- Generic test file
 
 -- polynomial order
 polyOrder = 2
