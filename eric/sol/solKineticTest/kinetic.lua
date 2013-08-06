@@ -43,7 +43,7 @@ Sn   = A*nPed*cPed/lSource
 -- domain extents
 XL, XU = -lParallel, lParallel
 -- number of cells
-NX, NV = 32, 16
+NX, NV = 16, 16
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(tPed*eV/electronMass)
 VL_ELC, VU_ELC = -6.0*vtElc, 6.0*vtElc
@@ -167,15 +167,14 @@ initDistfElc = Updater.EvalOnNodes2D {
      local nHat = 2*backgroundDens
      local vTe = math.sqrt(backgroundTemp*eV/electronMass)
 
-     return maxwellian(backgroundDens, 0.0, vTe, y)
-     --if x > lSource/2 then
-     --  return maxwellianRight(nHat, 0.0, vTe, y)
-     --elseif x < -lSource/2 then
-     --  return maxwellianLeft(nHat, 0.0, vTe, y)
-     --else
-     --  -- Must be between the source boundaries, use a linear combo.
-     --  return ((lSource/2 + x)*maxwellianRight(nHat, 0.0, vTe, y) + (lSource/2 - x)*maxwellianLeft(nHat, 0.0, vTe, y))/lSource
-     --end
+     if x > lSource/2 then
+       return maxwellianRight(nHat, 0.0, vTe, y)
+     elseif x < -lSource/2 then
+       return maxwellianLeft(nHat, 0.0, vTe, y)
+     else
+       -- Must be between the source boundaries, use a linear combo.
+       return ((lSource/2 + x)*maxwellianRight(nHat, 0.0, vTe, y) + (lSource/2 - x)*maxwellianLeft(nHat, 0.0, vTe, y))/lSource
+     end
 	 end
 }
 runUpdater(initDistfElc, 0.0, 0.0, {}, {distfElc})
@@ -199,16 +198,14 @@ initDistfIon = Updater.EvalOnNodes2D {
      local nHat = 2*backgroundDens
      local vTi = math.sqrt(backgroundTemp*eV/ionMass)
 
-     return maxwellian(backgroundDens, 0.0, vTi, y)
-
-     --if x > lSource/2 then
-     --  return maxwellianRight(nHat, 0.0, vTi, y)
-     --elseif x < -lSource/2 then
-     --  return maxwellianLeft(nHat, 0.0, vTi, y)
-     --else
+     if x > lSource/2 then
+       return maxwellianRight(nHat, 0.0, vTi, y)
+     elseif x < -lSource/2 then
+       return maxwellianLeft(nHat, 0.0, vTi, y)
+     else
        -- Must be between the source boundaries, use a linear combo.
-     --  return ((lSource/2 + x)*maxwellianRight(nHat, 0.0, vTi, y) + (lSource/2 - x)*maxwellianLeft(nHat, 0.0, vTi, y))/lSource
-     --end
+       return ((lSource/2 + x)*maxwellianRight(nHat, 0.0, vTi, y) + (lSource/2 - x)*maxwellianLeft(nHat, 0.0, vTi, y))/lSource
+     end
 	 end
 }
 runUpdater(initDistfIon, 0.0, 0.0, {}, {distfIon})
@@ -638,7 +635,7 @@ end
 function calcHamiltonianElc(curr, dt, phiIn, hamilOut)
    hamilOut:clear(0.0)
    copyPhi(copyTo2DElc, curr, dt, phiIn, hamilOut)
-   hamilOut:scale(Lucee.ElementaryCharge/electronMass)
+   hamilOut:scale(-Lucee.ElementaryCharge/electronMass)
    hamilOut:accumulate(1.0, hamilKeElc)
 end
 -- compute hamiltonian for ions
@@ -713,15 +710,14 @@ bcLowerIon, bcUpperIon = makeBcObjIon()
 
 -- apply boundary conditions
 function applyBc(curr, dt, fldElc, fldIon)
-   --for i,bc in ipairs({bcLowerElc, bcUpperElc}) do
-   --   runUpdater(bc, curr, dt, {}, {fldElc})
-   --end
-   --for i,bc in ipairs({bcLowerIon, bcUpperIon}) do
-   --   runUpdater(bc, curr, dt, {}, {fldIon})
-   --end
+   for i,bc in ipairs({bcLowerElc, bcUpperElc}) do
+      runUpdater(bc, curr, dt, {}, {fldElc})
+   end
+   for i,bc in ipairs({bcLowerIon, bcUpperIon}) do
+      runUpdater(bc, curr, dt, {}, {fldIon})
+   end
 
    for i,fld in ipairs({fldElc, fldIon}) do
-      fld:applyPeriodicBc(0)
       fld:applyCopyBc(1, "lower")
       fld:applyCopyBc(1, "upper")
    end
