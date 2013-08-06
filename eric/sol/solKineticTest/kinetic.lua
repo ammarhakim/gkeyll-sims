@@ -4,7 +4,7 @@
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.1/10
+cfl = 0.01
 
 -- physical constants
 -- eletron mass (kg)
@@ -862,6 +862,8 @@ end
 
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
+   numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
+   numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
    phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) )
 end
