@@ -47,7 +47,7 @@ Sn   = A*nPed*cPed/lSource
 XL, XU = -lParallel, lParallel
 VL, VU = -6.0*vtPed, 6.0*vtPed
 -- number of cells
-NX, NV = 16, 16
+NX, NV = 32, 16
 
 -- initial elm ion source temperature
 ionTemp = tPed

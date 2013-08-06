@@ -713,14 +713,15 @@ bcLowerIon, bcUpperIon = makeBcObjIon()
 
 -- apply boundary conditions
 function applyBc(curr, dt, fldElc, fldIon)
-   for i,bc in ipairs({bcLowerElc, bcUpperElc}) do
-      runUpdater(bc, curr, dt, {}, {fldElc})
-   end
-   for i,bc in ipairs({bcLowerIon, bcUpperIon}) do
-      runUpdater(bc, curr, dt, {}, {fldIon})
-   end
+   --for i,bc in ipairs({bcLowerElc, bcUpperElc}) do
+   --   runUpdater(bc, curr, dt, {}, {fldElc})
+   --end
+   --for i,bc in ipairs({bcLowerIon, bcUpperIon}) do
+   --   runUpdater(bc, curr, dt, {}, {fldIon})
+   --end
 
    for i,fld in ipairs({fldElc, fldIon}) do
+      fld:applyPeriodicBc(0)
       fld:applyCopyBc(1, "lower")
       fld:applyCopyBc(1, "upper")
    end
