@@ -57,7 +57,7 @@ lbAlpha = 0
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 500e-6
+tEnd = 2e-6
 nFrames = 5
 
 -- Determine number of global nodes per cell for use in creating CG
@@ -872,15 +872,15 @@ end
 function writeFields(frame)
    distf:write( string.format("distf_%d.h5", frame) )
    numDensity:write( string.format("numDensity_%d.h5", frame) )
-   phi1dDiscont:write( string.format("phi1d_%d.h5", frame) )
+   phi1dDiscont:write( string.format("phi_%d.h5", frame) )
    --hamil:write( string.format("hamil_%d.h5", frame) )
    --totalPtcl:write( string.format("totalPtcl_%d.h5", frame) )
    --totalPtclEnergy:write( string.format("totalPtclEnergy_%d.h5", frame) )
    --fieldEnergy:write( string.format("fieldEnergy_%d.h5", frame) )
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frame) )
-   tempProfile:write( string.format("tempProfile_%d.h5", frame) )
-   driftU:write( string.format("driftU_%d.h5", frame) )
-   firstMoment:write( string.format("mom1_%d.h5", frame) )
+   --tempProfile:write( string.format("tempProfile_%d.h5", frame) )
+   --driftU:write( string.format("driftU_%d.h5", frame) )
+   --firstMoment:write( string.format("mom1_%d.h5", frame) )
    --numDensInCell:write( string.format("numDensInCell_%d.h5", frame) )
 end
 
