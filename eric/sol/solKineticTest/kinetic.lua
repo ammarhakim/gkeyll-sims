@@ -56,7 +56,7 @@ lbAlpha = 0
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 10e-6
+tEnd = 225e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -166,17 +166,19 @@ initDistfElc = Updater.EvalOnNodes2D {
      
      -- Average background density
      local n0 = (0.7 + 0.3/2 + 0.5*lSource/(lParallel*math.pi))*1e19
-     local nHat = 2*(backgroundDens + kPerpTimesRho^2*n0)/(1 + kPerpTimesRho^2)
+     local nHat = (backgroundDens + kPerpTimesRho^2*n0)/(1 + kPerpTimesRho^2)
      local vTe = math.sqrt(backgroundTemp*eV/electronMass)
+
+     return maxwellian(nHat,0.0,vTe,y)
      
-     if x > lSource/2 then
-       return maxwellianRight(nHat, 0.0, vTe, y)
-     elseif x < -lSource/2 then
-       return maxwellianLeft(nHat, 0.0, vTe, y)
-     else
-       -- Must be between the source boundaries, use a linear combo.
-       return ((lSource/2 + x)*maxwellianRight(nHat, 0.0, vTe, y) + (lSource/2 - x)*maxwellianLeft(nHat, 0.0, vTe, y))/lSource
-     end
+     --if x > lSource/2 then
+     --  return maxwellianRight(nHat, 0.0, vTe, y)
+     --elseif x < -lSource/2 then
+     --  return maxwellianLeft(nHat, 0.0, vTe, y)
+     --else
+     --  -- Must be between the source boundaries, use a linear combo.
+     --  return ((lSource/2 + x)*maxwellianRight(nHat, 0.0, vTe, y) + (lSource/2 - x)*maxwellianLeft(nHat, 0.0, vTe, y))/lSource
+     --end
 	 end
 }
 runUpdater(initDistfElc, 0.0, 0.0, {}, {distfElc})
@@ -511,6 +513,9 @@ vFromMomentsCalc = Updater.VelocitiesFromMomentsUpdater {
   basis = basis_1d,
 }
 
+-- Output dynvector for reflectingBc (always size 2)
+cutoffVelocities = DataStruct.DynVector { numComponents = 2, }
+
 -- calculate number density at current time
 function calcNumDensity(calculator, curr, dt, distfIn, numDensOut)
    return runUpdater(calculator, curr, dt, {distfIn}, {numDensOut})
@@ -600,7 +605,8 @@ end
 -- compute phi from number density
 function calcPhiFromChargeDensity(curr, dt, distElcIn, distIonIn, phiOut)
    calcMoments(curr, dt, distElcIn, distIonIn)
-   runUpdater(electrostaticPhiCalc, curr, dt, {numDensityElc, numDensityIon, vThermSqElc}, {phiOut})
+   runUpdater(electrostaticPhiCalc, curr, dt, {numDensityElc, numDensityIon, 
+    vThermSqElc, cutoffVelocities}, {phiOut})
 end
 
 -- dynvector for heat flux at edge
@@ -673,23 +679,6 @@ bcConst = BoundaryCondition.Const {
    values = getRepTbl(polyOrder, 0.0),
 }
 
--- function to make make BC updaters
-function makeBcObjElc()
-   local bcLower = Updater.Bc2D {
-      onGrid = gridElc,
-      boundaryConditions = {bcConst},
-      dir = 0,
-      edge = "lower",
-   }
-   local bcUpper = Updater.Bc2D {
-      onGrid = gridElc,
-      boundaryConditions = {bcConst},
-      dir = 0,
-      edge = "upper",
-   }
-   return bcLower, bcUpper
-end
-
 function makeBcObjIon()
    local bcLower = Updater.Bc2D {
       onGrid = gridIon,
@@ -707,17 +696,22 @@ function makeBcObjIon()
 end
 
 -- make objects to apply BCs
-bcLowerElc, bcUpperElc = makeBcObjElc()
 bcLowerIon, bcUpperIon = makeBcObjIon()
+
+-- updater to apply boundary condition on distribution function
+reflectingBc = Updater.DistFuncReflectionBc {
+   onGrid = gridElc,
+   basis = basisElc,
+   edge = "both",
+}
 
 -- apply boundary conditions
 function applyBc(curr, dt, fldElc, fldIon)
-   for i,bc in ipairs({bcLowerElc, bcUpperElc}) do
-      runUpdater(bc, curr, dt, {}, {fldElc})
-   end
    for i,bc in ipairs({bcLowerIon, bcUpperIon}) do
       runUpdater(bc, curr, dt, {}, {fldIon})
    end
+   -- Use reflecting BC for the electrons
+   runUpdater(reflectingBc, curr, dt, {momentumIon}, {fldElc, cutoffVelocities})
 
    for i,fld in ipairs({fldElc, fldIon}) do
       fld:applyCopyBc(1, "lower")
@@ -862,10 +856,13 @@ end
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
    numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
-   distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
+   distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) )
+   cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum) )
+   momentumIon:write( string.format("mom1Ion_%d.h5", frameNum), tCurr)
+   momentumElc:write( string.format("mom1Elc_%d.h5", frameNum), tCurr)
 end
 
 applyBc(0.0, 0.0, distfElc, distfIon)
