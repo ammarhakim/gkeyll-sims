@@ -1,4 +1,5 @@
--- Input file for Poisson bracket operator
+-- Test to see if initializing the ion distribution function with half-maxwellians
+-- gives the correct heat flux at the target plate
 
 -- polynomial order
 polyOrder = 2

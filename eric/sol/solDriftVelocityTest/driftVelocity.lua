@@ -1,4 +1,5 @@
--- Input file for Poisson bracket operator
+-- Test to try to figure out if there is a better way to
+-- initialize the drift velocities (there isn't)
 
 -- polynomial order
 polyOrder = 2
