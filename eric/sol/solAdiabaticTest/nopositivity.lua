@@ -1,18 +1,20 @@
--- Input file for Poisson bracket operator
+-- Test to see effect of adiabatic elc without positivity
 
 -- polynomial order
-polyOrder = 2
+polyOrder = 1
 
 -- cfl number to use
 cfl = 0.1
 
 -- physical constants
+-- eletron mass (kg)
+electronMass = Lucee.ElectronMass
 -- electron volt to joules
-eV = 1.602e-19
+eV = Lucee.ElementaryCharge
 -- Deuterium ion mass (kg)
-ionMass = 2.014*1.66e-27
+ionMass = 2.014*Lucee.ProtonMass
 -- signed ion charge
-ionCharge = eV
+ionCharge = Lucee.ElementaryCharge
 
 -- physical input parameters
 
@@ -30,7 +32,6 @@ lSource = 25
 A = 1.2
 
 -- Derived parameters
-nMidplane = nPed;
 -- Thermal velocity of pedestal
 vtPed = math.sqrt(tPed*eV/ionMass)
 -- Pedestal sound speed (m/s)
@@ -42,17 +43,14 @@ Sn   = A*nPed*cPed/lSource
 XL, XU = -lParallel, lParallel
 VL, VU = -6.0*vtPed, 6.0*vtPed
 -- number of cells
-NX, NV = 16, 8
-
--- initial ion temperature
-ionTemp = tPed
+NX, NV = 32, 32
 
 -- L-B coefficient
 lbAlpha = 0
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1000e-6
+tEnd = 500e-6
 nFrames = 1
 
 -- Determine number of global nodes per cell for use in creating CG
@@ -86,6 +84,24 @@ basis = NodalFiniteElement2D.SerendipityElement {
 -- Maxwellian
 function maxwellian(vt, vdrift, x, v)
    return 1/math.sqrt(2*Lucee.Pi*vt^2)*math.exp(-(v-vdrift)^2/(2*vt^2))
+end
+
+-- Maxwellian (Right half only)
+function maxwellianRight(vt, vdrift, x, v)
+  if v >= 0 then
+    return 1/math.sqrt(2*Lucee.Pi*vt^2)*math.exp(-(v-vdrift)^2/(2*vt^2))
+  else
+    return 0
+  end
+end
+
+-- Maxwellian (Left half only)
+function maxwellianLeft(vt, vdrift, x, v)
+  if v <= 0 then
+    return 1/math.sqrt(2*Lucee.Pi*vt^2)*math.exp(-(v-vdrift)^2/(2*vt^2))
+  else
+    return 0
+  end
 end
 
 -- A generic function to run an updater.
@@ -136,7 +152,7 @@ dragDistf1 = DataStruct.Field2D {
 hamil = DataStruct.Field2D {
    onGrid = grid,
    -- numNodesPerCell is number of global nodes stored in each cell
-   numComponents = 1*numCgNodesPerCell,
+   numComponents = numCgNodesPerCell,
    ghost = {1, 1},
    -- ghost cells to write
    writeGhost = {0, 1} -- write extra layer on right to get nodes
@@ -146,7 +162,7 @@ hamil = DataStruct.Field2D {
 hamilKE = DataStruct.Field2D {
    onGrid = grid,
    -- numNodesPerCell is number of global nodes stored in each cell
-   numComponents = 1*numCgNodesPerCell,
+   numComponents = numCgNodesPerCell,
    ghost = {1, 1},
    -- ghost cells to write
    writeGhost = {0, 1} -- write extra layer on right to get nodes
@@ -170,7 +186,7 @@ initHamilKE:setOut( {hamilKE} )
 initHamilKE:advance(0.0) -- time is irrelevant
 
 -- updater to initialize distribution function
-initDistf = Updater.EvalOnNodes2D {
+initDistf = Updater.ProjectOnNodalBasis2D {
    onGrid = grid,
    -- basis functions to use
    basis = basis,
@@ -178,8 +194,26 @@ initDistf = Updater.EvalOnNodes2D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(x,y,z,t)
-		 return nMidplane*maxwellian(math.sqrt(250*eV/ionMass), 0.0, x, y)
-	      end
+     local backgroundTemp = 100 + 45*(1 - math.abs(x/lParallel))
+     local backgroundDens = 0.7 + 0.3*(1 - math.abs(x/lParallel))
+     if math.abs(x) < lSource/2 then
+       backgroundTemp = backgroundTemp + 30*math.cos(math.pi*x/lSource)
+       backgroundDens = backgroundDens + 0.5*math.cos(math.pi*x/lSource)
+     end
+     backgroundDens = backgroundDens*1e19
+     
+     local nHat = 2*backgroundDens
+     local vTi = math.sqrt(backgroundTemp*eV/ionMass)
+
+     if x > lSource/2 then
+       return nHat*maxwellianRight(vTi, 0.0, x, y)
+     elseif x < -lSource/2 then
+       return nHat*maxwellianLeft(vTi, 0.0, x, y)
+     else
+       -- Must be between the source boundaries, use a linear combo.
+       return ((lSource/2 + x)*nHat*maxwellianRight(vTi, 0.0, x, y) + (lSource/2 - x)*nHat*maxwellianLeft(vTi, 0.0, x, y))/lSource
+     end
+   end
 }
 initDistf:setOut( {distf} )
 -- initialize potential
@@ -194,7 +228,7 @@ particleSource = DataStruct.Field2D {
 -- clear out contents
 particleSource:clear(0.0)
 -- updater to fill out particle source
-particleSourceUpdater = Updater.EvalOnNodes2D {
+particleSourceUpdater = Updater.ProjectOnNodalBasis2D {
    onGrid = grid,
    -- basis functions to use
    basis = basis,
@@ -203,7 +237,11 @@ particleSourceUpdater = Updater.EvalOnNodes2D {
    -- function to use for initialization
    evaluate = function(x,y,z,t)
     if math.abs(x) < lSource/2 then
-      return Sn*math.cos(math.pi*x/lSource)*maxwellian(math.sqrt(ionTemp*eV/ionMass), 0.0, x, y)
+      if t < tELM then
+        return Sn*math.cos(math.pi*x/lSource)*maxwellian(math.sqrt(tPed*eV/ionMass), 0.0, x, y)
+      else
+        return Sn/9*math.cos(math.pi*x/lSource)*maxwellian(math.sqrt(260*eV/ionMass), 0.0, x, y)
+      end
     else
       return 0
     end
@@ -211,7 +249,9 @@ particleSourceUpdater = Updater.EvalOnNodes2D {
 }
 particleSourceUpdater:setOut( {particleSource} )
 -- initialize
-particleSourceUpdater:advance(0.0) -- time is irrelevant
+particleSourceUpdater:advance(0.0)
+-- keeps track of whether to update particlesources again
+postELM = false
 
 -- updater for Poisson bracket
 pbSlvr = Updater.PoissonBracket {
@@ -235,6 +275,10 @@ lbDragSlvr = Updater.LenardBernsteinDragUpdater2D {
   diffusionCoeff = lbAlpha,
   -- onlyIncrement is true
   onlyIncrement = true,
+  -- use braginskii coeff instead of lbAlpha?
+  useBraginskii = false,
+  -- required if useBraginskii = true
+  ionMass = ionMass,
 }
 
 -- updater for L-B drag term
@@ -248,6 +292,10 @@ lbDiffSlvr = Updater.LenardBernsteinDiffUpdater2D {
   diffusionCoeff = lbAlpha,
   -- onlyIncrement is true
   onlyIncrement = true,
+  -- use braginskii coeff instead of lbAlpha?
+  useBraginskii = false,
+  -- required if useBraginskii = true
+  ionMass = ionMass,
 }
 
 -- spatial grid
@@ -258,7 +306,7 @@ grid_1d = Grid.RectCart1D {
 }
 
 -- spatial FEM nodal basis
-basis_1d = NodalFiniteElement1D.Lobatto {
+basis_1d = NodalFiniteElement1D.LagrangeTensor {
    -- grid on which elements should be constructured
    onGrid = grid_1d,
    -- polynomial order in each cell. One of 1, or 2. Corresponding
@@ -286,9 +334,41 @@ vThermSq = DataStruct.Field1D {
 -- clear out contents
 vThermSq:clear(0.0)
 
+mom0Source = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+
+mom2Source = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+
 -- Ion Temperature Profile
 tempProfile = DataStruct.Field1D {
    onGrid = grid_1d,
+   -- numNodesPerCell is number of global nodes stored in each cell
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+
+-- field to store continous potential in 1D
+phi1d = DataStruct.Field1D {
+   onGrid = grid_1d,
+   -- numNodesPerCell is number of global nodes stored in each cell
+   numComponents = 1*numCgNodesPerCell_1d,
+   -- ghost cells
+   ghost = {1, 1},
+   -- write ghosts
+   writeGhost = {0, 1},
+}
+
+-- field to store discontinous potential in 1D
+phi1dDiscont = DataStruct.Field1D {
+   onGrid = grid_1d,
+   location = "vertex",
    -- numNodesPerCell is number of global nodes stored in each cell
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
@@ -427,6 +507,14 @@ totalPtclEnergyCalc:setIn( {ptclEnergy} )
 -- set output dynvector
 totalPtclEnergyCalc:setOut( {totalPtclEnergy} )
 
+-- Dynvector to store 1st and 3rd moments at left and right edges
+momentsAtEdges = DataStruct.DynVector { numComponents = 4, }
+
+momentsAtEdgesCalc = Updater.MomentsAtEdgesUpdater {
+  onGrid = grid,
+  basis = basis,
+}
+
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 3, }
 
@@ -436,15 +524,10 @@ heatFluxAtEdgeCalc = Updater.HeatFluxAtEdgeUpdater {
    onGrid = grid_1d,
    -- basis functions to use
    basis = basis_1d,
-   -- are common nodes shared?
-   shareCommonNodes = false, -- for DG fields common nodes not shared
    ionMass = ionMass,
+   -- Perpendicular temperature of ions and electrons
+   tPerp = tPed,
 }
-
--- set input field
-heatFluxAtEdgeCalc:setIn( {firstMoment, thirdMoment, vThermSq} )
--- set output dynvector
-heatFluxAtEdgeCalc:setOut( {heatFluxAtEdge} )
 
 vFromMomentsCalc = Updater.VelocitiesFromMomentsUpdater {
   onGrid = grid_1d,
@@ -493,30 +576,14 @@ function calcMoments(curr, dt, distfIn)
    calcThirdMoment(curr, dt, distfIn, thirdMoment)
 end
 
--- field to store continous potential in 1D
-phi1d = DataStruct.Field1D {
-   onGrid = grid_1d,
-   -- numNodesPerCell is number of global nodes stored in each cell
-   numComponents = 1*numCgNodesPerCell_1d,
-   -- ghost cells
-   ghost = {1, 1},
-   -- write ghosts
-   writeGhost = {0, 1},
-}
-
--- field to store discontinous potential in 1D
-phi1dDiscont = DataStruct.Field1D {
-   onGrid = grid_1d,
-   location = "vertex",
-   -- numNodesPerCell is number of global nodes stored in each cell
-   numComponents = basis_1d:numNodes(),
-   ghost = {1, 1},
-}
-
 -- updater to copy 1D field to 2D field
-copyTo2D = Updater.Copy1DTo2DNodalField {
-   -- grid for updater
+copyTo2D = Updater.NodalCopyFaceToInteriorUpdater {
+   basis1d = basis_1d,
+   basis2d = basis,
    onGrid = grid,
+   -- 1D data lives along x-direction
+   dir = 1,
+   shareCommonNodes = true,
 }
 
 -- function to copy 1D field to 2D field
@@ -534,6 +601,10 @@ phiFromNumDensityCalc = Updater.BoltzmannPhiUpdater {
    onGrid = grid_1d,
    -- basis functions to use
    basis = basis_1d,
+   -- required physical parameters
+   electronMass = electronMass,
+   ionMass = ionMass,
+   elementaryCharge = eV,
 }
 
 -- updater to move phi to continuous field
@@ -622,26 +693,26 @@ function poissonBracket(curr, dt, distfIn, hamilIn, distfOut)
 end
 
 -- update L-B drag operator
-function solveDrag(curr, dt, distfIn, uIn, distfOut)
+function solveDrag(curr, dt, distfIn, uIn, vThermSqIn, numDensityIn, distfOut)
    lbDragSlvr:setCurrTime(curr)
-   lbDragSlvr:setIn( {distfIn, uIn} )
+   lbDragSlvr:setIn( {distfIn, uIn, vThermSqIn, numDensityIn} )
    lbDragSlvr:setOut( {distfOut} )
    return lbDragSlvr:advance(curr+dt)
 end
 
 -- update L-B diffusion operator
-function solveDiff(curr, dt, distfIn, vThermSqIn, distfOut)
+function solveDiff(curr, dt, distfIn, vThermSqIn, numDensityIn, distfOut)
    lbDiffSlvr:setCurrTime(curr)
-   lbDiffSlvr:setIn( {distfIn, vThermSqIn} )
+   lbDiffSlvr:setIn( {distfIn, vThermSqIn, numDensityIn} )
    lbDiffSlvr:setOut( {distfOut} )
    return lbDiffSlvr:advance(curr+dt)
 end
 
 -- compute phi from number density and thermal velocity
-function calcPhiFromNumDensity(curr, dt, numDensIn, vtSqIn, phiOut)
+function calcPhiFromNumDensity(curr, dt, numDensIn, vtSqIn, mom1In, phiOut)
    phiOut:clear(0.0)
    phiFromNumDensityCalc:setCurrTime(curr)
-   phiFromNumDensityCalc:setIn( {numDensIn, vtSqIn} )
+   phiFromNumDensityCalc:setIn( {numDensIn, mom1In, vtSqIn} )
    phiFromNumDensityCalc:setOut( {phiOut} )
    return phiFromNumDensityCalc:advance(curr+dt)
 end
@@ -664,8 +735,7 @@ end
 function calcHamiltonian(curr, dt, distIn, hamilOut)
    calcMoments(curr, dt, distIn)
    calcVelocitiesFromMoments(curr, dt)
-   calcPhiFromNumDensity(curr, dt, numDensity, vThermSq, phi1dDiscont)
-   phi1dDiscont:scale(ionMass/ionCharge)
+   calcPhiFromNumDensity(curr, dt, numDensity, vThermSq, firstMoment, phi1dDiscont)
    calcContinuousPhi(curr, dt, phi1dDiscont, phi1d)
 
    hamilOut:clear(0.0)
@@ -685,8 +755,9 @@ function calcDiagnostics(curr, dt)
    totalPtclEnergyCalc:setCurrTime(curr)
    totalPtclEnergyCalc:advance(curr+dt)
 
-   heatFluxAtEdgeCalc:setCurrTime(curr)
-   heatFluxAtEdgeCalc:advance(curr+dt)
+   runUpdater(momentsAtEdgesCalc, curr, dt, {distf}, {momentsAtEdges})
+
+   runUpdater(heatFluxAtEdgeCalc, curr, dt, {vThermSq, phi1dDiscont, momentsAtEdges}, {heatFluxAtEdge})
 
    fieldEnergyCalc:setCurrTime(curr)
    fieldEnergyCalc:advance(curr+dt)
@@ -702,59 +773,67 @@ function rk3(tCurr, myDt)
    local diffStatus, dragDtSuggested
    local dragStatus, diffDtSuggested
 
+   if (postELM == false) then
+     if tCurr + myDt > tELM then
+       postELM = true
+       particleSourceUpdater:advance(tCurr + myDt)
+
+       -- Calculate first moment of particle source at t = 0
+        calcNumDensity(0.0, 0.0, particleSource, mom0Source)
+        -- Calculate second moment of particle source at t = 0
+        calcPtclEnergy(0.0, 0.0, particleSource, mom2Source)
+     end
+   end
+
    -- RK stage 1
    pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf, hamil, distf1)
-   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf, vThermSq, diffDistf1)
-   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf, driftU, dragDistf1)
-
-   distf1:accumulate(myDt, diffDistf1)
-   distf1:accumulate(myDt, dragDistf1)
-   if tCurr < tELM then
-    distf1:accumulate(myDt, particleSource)
-   end
+   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf, vThermSq, numDensity, diffDistf1)
+   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf, driftU, vThermSq, numDensity, dragDistf1)
    
    if (pbStatus == false or diffStatus == false or dragStatus == false) then
       return false, math.min(pbDtSuggested, diffDtSuggested, dragDtSuggested)
    end
+
+   distf1:accumulate(myDt, diffDistf1)
+   distf1:accumulate(myDt, dragDistf1)
+   distf1:accumulate(myDt, particleSource)
 
    applyBc(tCurr, myDt, distf1)
    calcHamiltonian(tCurr, myDt, distf1, hamil)
 
    -- RK stage 2
    pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf1, hamil, distfNew)
-   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, diffDistf1)
-   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, dragDistf1)
-
-   distfNew:accumulate(myDt, diffDistf1)
-   distfNew:accumulate(myDt, dragDistf1)
-   if tCurr < tELM then
-    distfNew:accumulate(myDt, particleSource)
-   end
+   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, numDensity, diffDistf1)
+   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, vThermSq, numDensity, dragDistf1)
 
    if (pbStatus == false or diffStatus == false or dragStatus == false) then
      return false, math.min(pbDtSuggested, diffDtSuggested, dragDtSuggested)
    end
 
+   distfNew:accumulate(myDt, diffDistf1)
+   distfNew:accumulate(myDt, dragDistf1)
+   distfNew:accumulate(myDt, particleSource)
+
    distf1:combine(3.0/4.0, distf, 1.0/4.0, distfNew)
+
    applyBc(tCurr, myDt, distf1)
    calcHamiltonian(tCurr, myDt, distf1, hamil)
 
    -- RK stage 3
    pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf1, hamil, distfNew)
-   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, diffDistf1)
-   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, dragDistf1)
-   
-   distfNew:accumulate(myDt, diffDistf1)
-   distfNew:accumulate(myDt, dragDistf1)
-   if tCurr < tELM then
-    distfNew:accumulate(myDt, particleSource)
-   end
+   diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, numDensity, diffDistf1)
+   dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, vThermSq, numDensity, dragDistf1)
 
    if (pbStatus == false or diffStatus == false or dragStatus == false) then
      return false, math.min(pbDtSuggested, diffDtSuggested, dragDtSuggested)
-   end
+   end   
+   
+   distfNew:accumulate(myDt, diffDistf1)
+   distfNew:accumulate(myDt, dragDistf1)
+   distfNew:accumulate(myDt, particleSource)
    
    distf1:combine(1.0/3.0, distf, 2.0/3.0, distfNew)
+
    applyBc(tCurr, myDt, distf1)
    distf:copy(distf1)
    calcHamiltonian(tCurr, myDt, distf, hamil)
@@ -771,59 +850,66 @@ function advanceFrame(tStart, tEnd, initDt)
 
    while tCurr<=tEnd do
       distfDup:copy(distf)
+      hamilDup:copy(hamil)
 
       if (tCurr+myDt > tEnd) then
-	 myDt = tEnd-tCurr
+	      myDt = tEnd-tCurr
       end
 
       print (string.format("Taking step %d at time %g with dt %g", step, tCurr, myDt))
       status, dtSuggested = rk3(tCurr, myDt)
 
       if (status == false) then
-	 print (string.format("** Time step %g too large! Will retake with dt %g", myDt, dtSuggested))
-	 distf:copy(distfDup)
-	 myDt = dtSuggested
+	      print (string.format("** Time step %g too large! Will retake with dt %g", myDt, dtSuggested))
+	      distf:copy(distfDup)
+	      hamil:copy(hamilDup)
+	      myDt = dtSuggested
       else
-	 calcDiagnostics(tCurr, myDt)
+	      calcDiagnostics(tCurr, myDt)
 
-	 tCurr = tCurr + myDt
-	 myDt = dtSuggested
-	 step = step + 1
-	 if (tCurr >= tEnd) then
-	    break
-	 end
+	      tCurr = tCurr + myDt
+	      myDt = dtSuggested
+	      step = step + 1
+	      if (tCurr >= tEnd) then
+	        break
+	      end
       end
-
    end
    return dtSuggested
 end
 
 -- write data to H5 files
-function writeFields(frame)
-   --distf:write( string.format("distf_%d.h5", frame) )
+function writeFields(frameNum, tCurr)
+   --distf:write( string.format("distfIon_%d.h5", frame) )
    --numDensity:write( string.format("numDensity_%d.h5", frame) )
-   --phi1d:write( string.format("phi1d_%d.h5", frame) )
+   --phi1dDiscont:write( string.format("phi_%d.h5", frame) )
    --hamil:write( string.format("hamil_%d.h5", frame) )
    --totalPtcl:write( string.format("totalPtcl_%d.h5", frame) )
    --totalPtclEnergy:write( string.format("totalPtclEnergy_%d.h5", frame) )
    --fieldEnergy:write( string.format("fieldEnergy_%d.h5", frame) )
-   heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frame) )
+   heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    --tempProfile:write( string.format("tempProfile_%d.h5", frame) )
-   --vThermSq:write( string.format("vThermSq_%d.h5", frame) )
+   --driftU:write( string.format("driftU_%d.h5", frame) )
+   --firstMoment:write( string.format("mom1Ion_%d.h5", frame) , tCurr)
+   --thirdMoment:write( string.format("mom3Ion_%d.h5", frame) , tCurr)
    --numDensInCell:write( string.format("numDensInCell_%d.h5", frame) )
 end
 
---hamilKE:write("hamilKE.h5")
---numDensityElc:write("numDensityElc.h5")
+-- Calculate first moment of particle source at t = 0
+calcNumDensity(0.0, 0.0, particleSource, mom0Source)
+-- Calculate second moment of particle source at t = 0
+calcPtclEnergy(0.0, 0.0, particleSource, mom2Source)
+
 applyBc(0.0, 0.0, distf)
 -- calculate initial Hamiltonian
 calcHamiltonian(0.0, 0.0, distf, hamil)
 -- compute initial diagnostics
 calcDiagnostics(0.0, 0.0)
 -- write out initial conditions
-writeFields(0)
+writeFields(0, 0.0)
 -- make a duplicate in case we need it
 distfDup = distf:duplicate()
+hamilDup = hamil:duplicate()
 
 -- parameters to control time-stepping
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
@@ -833,7 +919,7 @@ tCurr = tStart
 for frame = 1, nFrames do
    Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
    dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
-   writeFields(frame)
+   writeFields(frame, tCurr+tFrame)
    tCurr = tCurr+tFrame
    Lucee.logInfo ("")
 end
