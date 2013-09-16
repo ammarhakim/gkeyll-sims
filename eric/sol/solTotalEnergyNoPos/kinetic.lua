@@ -1,8 +1,9 @@
 -- Input file for SOL problem with kinetic ions and electrons
 -- This test has positivty preservation turned off
+-- polyOrder = 1 and kPerpRho = 0.2
 
 -- polynomial order
-polyOrder = 2
+polyOrder = 1
 
 -- cfl number to use
 cfl = 0.1
@@ -34,8 +35,6 @@ lSource = 25
 A = 1.2
 
 -- Derived parameters
--- Thermal velocity of pedestal
-vtPed = math.sqrt(tPed*eV/ionMass)
 -- Pedestal sound speed (m/s)
 cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
@@ -54,7 +53,7 @@ VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 10.0e-6
+tEnd = 300.0e-6
 nFrames = 1
 
 -- A generic function to run an updater.
