@@ -529,6 +529,17 @@ heatFluxAtEdgeCalc = Updater.HeatFluxAtEdgeUpdater {
    tPerp = tPed,
 }
 
+-- dynvector for total energy in system
+totalEnergy = DataStruct.DynVector { numComponents = 3, }
+-- updater to compute total energy
+totalEnergyCalc = Updater.KineticTotalEnergyUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+  tPerp = tPed,
+  ionMass = ionMass,
+  electronMass = electronMass,
+}
+
 vFromMomentsCalc = Updater.VelocitiesFromMomentsUpdater {
   onGrid = grid_1d,
   basis = basis_1d,
