@@ -66,7 +66,7 @@ VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 300.0e-6
+tEnd = 20.0e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -638,9 +638,9 @@ function calcPhiFromChargeDensity(curr, dt, distElcIn, distIonIn, cutoffVIn, phi
    runUpdater(electrostaticPhiCalc, curr, dt, {numDensityElc, numDensityIon, cutoffVIn}, {phiOut})
 end
 
--- Dynvectors to store 1st and 3rd moments at left and right edges
-momentsAtEdgesElc = DataStruct.DynVector { numComponents = 6, }
-momentsAtEdgesIon = DataStruct.DynVector { numComponents = 6, }
+-- Dynvectors to store 0-3rd moments at left and right edges
+momentsAtEdgesElc = DataStruct.DynVector { numComponents = 8, }
+momentsAtEdgesIon = DataStruct.DynVector { numComponents = 8, }
 
 momentsAtEdgesElcCalc = Updater.MomentsAtEdgesUpdater {
   onGrid = gridElc,
@@ -654,6 +654,8 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdgesUpdater {
 
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
+-- dynvector for sheath power transmission coefficients
+sheathCoefficients = DataStruct.DynVector { numComponents = 4, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
@@ -665,6 +667,8 @@ heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
    electronMass = electronMass,
    -- Perpendicular temperature of ions and electrons
    tPerp = tPed,
+   -- Enable calculation of sheath coefficients
+   computeSheathCoefficient = true,
 }
 
 -- dynvector for energy computed using discrete hamiltonian
@@ -793,7 +797,7 @@ function calcDiagnostics(curr, dt)
    runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilKeElcDg}, {momentsAtEdgesElc})
    runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon, hamilKeIonDg}, {momentsAtEdgesIon})
    -- compute heat flux at edges
-   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc, momentsAtEdgesIon}, {heatFluxAtEdge})
+   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc, momentsAtEdgesIon}, {heatFluxAtEdge, sheathCoefficients})
 
    -- Copy potential to 2d grids
    --runUpdater(copyTo2DElc, curr, dt, {phi1d}, {phi2dElc})
@@ -958,6 +962,7 @@ function writeFields(frameNum, tCurr)
    distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
+   sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
    --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum) )
    totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
    --momentumIon:write( string.format("mom1Ion_%d.h5", frameNum), tCurr)
