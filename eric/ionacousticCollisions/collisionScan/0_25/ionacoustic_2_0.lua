@@ -33,7 +33,7 @@ lbAlpha = 0
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 100.0
+tEnd = 28.0
 nFrames = 1
 
 -- Determine number of global nodes per cell for use in creating CG

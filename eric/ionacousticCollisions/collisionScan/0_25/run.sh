@@ -11,11 +11,7 @@
 #PBS -V 
 #PBS -j oe 
  
-CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i ionacoustic_0_005.lua -pc_type lu; \
-  /p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i ionacoustic_0_01.lua -pc_type lu; \
-  /p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i ionacoustic_0_1.lua -pc_type lu; \
-  /p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i ionacoustic_1_0.lua -pc_type lu; \
-  /p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i ionacoustic_2_0.lua -pc_type lu" 
+CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i ionacoustic_2_0.lua -pc_type lu" 
 cd $PBS_O_WORKDIR 
 $CMD 
 exit

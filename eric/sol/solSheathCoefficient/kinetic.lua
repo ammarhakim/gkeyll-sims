@@ -3,7 +3,7 @@
 -- PolyOrder 2 and kPerp = 0.2
 
 -- polynomial order
-polyOrder = 1
+polyOrder = 2
 
 -- cfl number to use
 cfl = 0.1
@@ -66,7 +66,7 @@ VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 20.0e-6
+tEnd = 300.0e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -655,7 +655,7 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdgesUpdater {
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
 -- dynvector for sheath power transmission coefficients
-sheathCoefficients = DataStruct.DynVector { numComponents = 4, }
+sheathCoefficients = DataStruct.DynVector { numComponents = 1, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
@@ -958,8 +958,8 @@ end
 function writeFields(frameNum, tCurr)
    --numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
    --numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
-   distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
-   distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
+   --distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
+   --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
