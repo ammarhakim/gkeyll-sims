@@ -183,7 +183,6 @@ initDistfElc = Updater.ProjectOnNodalBasis2D {
 	 end
 }
 runUpdater(initDistfElc, 0.0, 0.0, {}, {distfElc})
-distfElc:clear(0.0)
 
 -- updater to initialize distribution function
 initDistfIon = Updater.ProjectOnNodalBasis2D {
@@ -215,7 +214,6 @@ initDistfIon = Updater.ProjectOnNodalBasis2D {
 	 end
 }
 runUpdater(initDistfIon, 0.0, 0.0, {}, {distfIon})
-distfIon:clear(0.0)
 
 -- extra fields for performing RK update
 distfNewElc = DataStruct.Field2D {
@@ -950,15 +948,15 @@ end
 
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
-   --numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
-   --numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
+   numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
+   numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
    distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
 
    hamilElc:write( string.format("hamilElc_%d.h5", frameNum), tCurr)
    hamilIon:write( string.format("hamilIon_%d.h5", frameNum), tCurr)
    --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
-   --heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
+   heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
    --sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
    --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum) )
    --totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
