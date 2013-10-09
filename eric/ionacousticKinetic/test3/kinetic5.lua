@@ -1,5 +1,6 @@
 -- Input file for ion acoustic problem with kinetic ions and electrons
--- Basic case
+-- Uses project on nodal basis instead of evalonnodes
+-- Uses initial condition with velocity dependence in electron distf
 
 -- polynomial order
 polyOrder = 2
@@ -50,7 +51,7 @@ VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 20e-5
+tEnd = 15e-5
 nFrames = 5
 
 -- Determine number of global nodes per cell for use in creating CG
@@ -121,7 +122,7 @@ function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
 end
 
 -- updater to initialize distribution function
-initDistfElc = Updater.EvalOnNodes2D {
+initDistfElc = Updater.ProjectOnNodalBasis2D {
    onGrid = gridElc,
    -- basis functions to use
    basis = basisElc,
@@ -130,17 +131,18 @@ initDistfElc = Updater.EvalOnNodes2D {
    -- function to use for initialization
    evaluate = function(x,y,z,t)
       local elcThermal = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
-      local alpha = 0.01 -- perturbation
+      local alpha = 0.0001 -- perturbation
 		  local k = knumber
-		  local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
-		    (1+kPerpTimesRho*kPerpTimesRho)
+		  --local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
+		  --  (1+kPerpTimesRho*kPerpTimesRho)
+		  local nHat = initNumDens*(1+alpha*math.cos(k*x)*y/elcThermal)
 		  return maxwellian(nHat, elcDrift, elcThermal, y)
 	   end
 }
 runUpdater(initDistfElc, 0.0, 0.0, {}, {distfElc})
 
 -- updater to initialize distribution function
-initDistfIon = Updater.EvalOnNodes2D {
+initDistfIon = Updater.ProjectOnNodalBasis2D {
    onGrid = gridIon,
    basis = basisIon,
    -- are common nodes shared?
@@ -150,7 +152,7 @@ initDistfIon = Updater.EvalOnNodes2D {
 		 local ionThermal = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
 		 local alpha = 0.01 -- perturbation
 		 local k = knumber
-		 return (1+alpha*math.cos(k*x))*maxwellian(initNumDens, ionDrift, ionThermal, y)
+		 return maxwellian(initNumDens, ionDrift, ionThermal, y)
 	  end
 }
 runUpdater(initDistfIon, 0.0, 0.0, {}, {distfIon})
