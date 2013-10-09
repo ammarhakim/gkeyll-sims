@@ -1,6 +1,7 @@
 -- Input file for ion acoustic problem with kinetic ions and electrons
 -- Electromagnetic terms added
 -- Basic test case.. using real units
+-- Initial condition minimizes omega_h
 
 -- polynomial order
 polyOrder = 2

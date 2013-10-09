@@ -10,7 +10,7 @@ cfl = 0.1
 
 -- physical constants
 -- eletron mass (kg)
-electronMass = Lucee.ElectronMass
+elcMass = Lucee.ElectronMass
 -- electron volt to joules
 eV = Lucee.ElementaryCharge
 -- Deuterium ion mass (kg)
@@ -18,7 +18,7 @@ ionMass = 2.014*Lucee.ProtonMass
 -- signed ion charge
 ionCharge = Lucee.ElementaryCharge
 -- signed electron charge
-electronCharge = -Lucee.ElementaryCharge
+elcCharge = -Lucee.ElementaryCharge
 
 -- physical input parameters
 
@@ -40,6 +40,8 @@ A = 1.2
 -- Magnetic field (Tesla)
 B0 = 1
 
+mu0 = Lucee.Mu0
+
 -- Derived parameters
 -- Ion cyclotron frequency
 Omega_i = Lucee.ElementaryCharge*B0/ionMass
@@ -58,17 +60,17 @@ Sn   = A*nPed*cPed/lSource
 -- domain extents
 XL, XU = -lParallel, lParallel
 -- number of cells
-NX, NP = 32, 32
+NX, NP = 16, 16
 -- compute max thermal speed to set velocity space extents
-vtElc = math.sqrt(tPed*eV/electronMass)
-PL_ELC, PU_ELC = -6.0*electronMass*vtElc, 6.0*electronMass*vtElc
+vtElc = math.sqrt(tPed*eV/elcMass)
+PL_ELC, PU_ELC = -6.0*elcMass*vtElc, 6.0*elcMass*vtElc
 
 vtIon = math.sqrt(tPed*eV/ionMass)
 PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 300.0e-6
+tEnd = 200.0e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -201,8 +203,8 @@ initDistfElc = Updater.ProjectOnNodalBasis2D {
      -- Average background density
      local n0 = (0.7 + 0.3/2 + 0.5*lSource/(lParallel*math.pi))*1e19
      local nHat = (initialElectronDens(x) + kPerpTimesRho^2*n0)/(1 + kPerpTimesRho^2)
-     local vTe = math.sqrt(initialElectronTemp(x)*eV/electronMass)
-     return maxwellian(nHat, electronMass, vTe, y)
+     local vTe = math.sqrt(initialElectronTemp(x)*eV/elcMass)
+     return maxwellian(nHat, elcMass, vTe, y)
 	 end
 }
 runUpdater(initDistfElc, 0.0, 0.0, {}, {distfElc})
@@ -407,9 +409,9 @@ particleSourceUpdaterElc = Updater.ProjectOnNodalBasis2D {
    evaluate = function(x,y,z,t)
     if math.abs(x) < lSource/2 then
       if t < tELM then
-        return maxwellian(Sn*math.cos(math.pi*x/lSource), electronMass, math.sqrt(tPed*eV/electronMass), y)
+        return maxwellian(Sn*math.cos(math.pi*x/lSource), elcMass, math.sqrt(tPed*eV/elcMass), y)
       else
-        return maxwellian(Sn/9*math.cos(math.pi*x/lSource), electronMass, math.sqrt(210*eV/electronMass), y)
+        return maxwellian(Sn/9*math.cos(math.pi*x/lSource), elcMass, math.sqrt(210*eV/elcMass), y)
       end
     else
       return 0
@@ -575,7 +577,7 @@ function calcMoments(curr, dt, distfElcIn, distfIonIn)
   
   -- Use moment 0 fields to calculate number densities
   numDensityElc:clear(0.0)
-  numDensityElc:accumulate(1/electronMass, mom0Elc)
+  numDensityElc:accumulate(1/elcMass, mom0Elc)
   numDensityIon:clear(0.0)
   numDensityIon:accumulate(1/ionMass, mom0Ion)
 end
@@ -600,8 +602,11 @@ electromagneticACalc = Updater.ElectromagneticAUpdater {
   onGrid = grid_1d,
   basis = basis_1d,
   kPerp = kPerp,
-  electronMass = electronMass,
+  elcMass = elcMass,
   ionMass = ionMass,
+  elcCharge = elcCharge,
+  ionCharge = ionCharge,
+  mu0 = mu0,
 }
 
 -- field to store continuous potential in 1D
@@ -663,14 +668,18 @@ end
 momentsAtEdgesElc = DataStruct.DynVector { numComponents = 8, }
 momentsAtEdgesIon = DataStruct.DynVector { numComponents = 8, }
 
-momentsAtEdgesElcCalc = Updater.MomentsAtEdgesUpdater {
+momentsAtEdgesElcCalc = Updater.ElectromagneticMomentsAtEdgesUpdater {
   onGrid = gridElc,
   basis = basisElc,
+  speciesMass = elcMass,
+  speciesCharge = elcCharge,
 }
 
-momentsAtEdgesIonCalc = Updater.MomentsAtEdgesUpdater {
+momentsAtEdgesIonCalc = Updater.ElectromagneticMomentsAtEdgesUpdater {
   onGrid = gridIon,
   basis = basisIon,
+  speciesMass = ionMass,
+  speciesCharge = ionCharge,
 }
 
 -- Fields to store the KE part of the hamiltonians
@@ -710,7 +719,7 @@ heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
    -- basis functions to use
    basis = basis_1d,
    ionMass = ionMass,
-   electronMass = electronMass,
+   electronMass = elcMass,
    -- Perpendicular temperature of ions and electrons
    tPerp = tPed,
 }
@@ -739,7 +748,7 @@ totalEnergyCalc = Updater.KineticTotalEnergyUpdater {
   onGrid = grid_1d,
   basis = basis_1d,
   ionMass = ionMass,
-  electronMass = electronMass,
+  electronMass = elcMass,
 }
 
 -- updater to move a discontinuous field to a continuous field
@@ -838,22 +847,22 @@ function calcHamiltonianElc(curr, dt, phiIn, aParallel1dIn, aSquared1dIn, hamilK
 
    -- Accumulate q*Phi contribution to hamiltonian
    copyCont1DTo2D(copyTo2DElc, curr, dt, phiIn, hamilOut)
-   hamilOut:scale(ionCharge)
+   hamilOut:scale(elcCharge)
 
    -- Accumulate p^2/2m to KE hamiltonian
-   hamilKeOut:accumulate(0.5/ionMass, hamilPSquaredElc)
+   hamilKeOut:accumulate(0.5/elcMass, hamilPSquaredElc)
 
    -- Compute projection of A(x)^2 onto 2D grid
    copyCont1DTo2D(copyTo2DElc, curr, dt, aSquared1dIn, aSquared2dElc)
    -- Accumulate q^2/2m*A^2 to KE hamiltonian
-   hamilKeOut:accumulate(0.5*ionCharge^2/ionMass, aSquared2dElc)
+   hamilKeOut:accumulate(0.5*elcCharge^2/elcMass, aSquared2dElc)
 
    -- Compute projection of aParallel onto 2D grid
    copyCont1DTo2D(copyTo2DElc, curr, dt, aParallel1dIn, aParallel2dElc)
    -- Compute A(x)*p on a 2D grid
    runUpdater(aTimesPElcCalc, curr, dt, {aParallel2dElc}, {aTimesPElc})
    -- Accumulate -q/m*p*A to KE hamiltonian
-   hamilKeOut:accumulate(-ionCharge/ionMass, aTimesPElc)
+   hamilKeOut:accumulate(-elcCharge/elcMass, aTimesPElc)
 
    -- Accumulate the KE hamiltonian to the full hamiltonian
    hamilOut:accumulate(1.0, hamilKeOut)
@@ -868,22 +877,22 @@ function calcHamiltonianIon(curr, dt, phiIn, aParallel1dIn, aSquared1dIn, hamilK
 
    -- Accumulate q*Phi contribution to hamiltonian
    copyCont1DTo2D(copyTo2DIon, curr, dt, phiIn, hamilOut)
-   hamilOut:scale(electronCharge)
+   hamilOut:scale(ionCharge)
 
    -- Accumulate p^2/2m to hamiltonian
-   hamilKeOut:accumulate(0.5/electronMass, hamilPSquaredIon)
+   hamilKeOut:accumulate(0.5/ionMass, hamilPSquaredIon)
 
    -- Compute projection of A(x)^2 onto 2D grid
    copyCont1DTo2D(copyTo2DIon, curr, dt, aSquared1dIn, aSquared2dIon)
    -- Accumulate q^2/2m*A^2 to hamiltonian
-   hamilKeOut:accumulate(0.5*electronCharge^2/electronMass, aSquared2dIon)
+   hamilKeOut:accumulate(0.5*ionCharge^2/ionMass, aSquared2dIon)
 
    -- Compute projection of aParallel onto 2D grid
    copyCont1DTo2D(copyTo2DIon, curr, dt, aParallel1dIn, aParallel2dIon)
    -- Compute A(x)*p on a 2D grid
    runUpdater(aTimesPIonCalc, curr, dt, {aParallel2dIon}, {aTimesPIon})
    -- Accumulate -q/m*p*A to hamiltonian
-   hamilKeOut:accumulate(-electronCharge/electronMass, aTimesPIon)
+   hamilKeOut:accumulate(-ionCharge/ionMass, aTimesPIon)
 
    -- Accumulate the KE hamiltonian to the full hamiltonian
    hamilOut:accumulate(1.0, hamilKeOut)
@@ -939,9 +948,9 @@ reflectingBc = Updater.ElectromagneticDistFuncReflectionBc {
    basis = basisElc,
    edge = "both",
    -- physical parameters
-   elcCharge = electronCharge,
+   elcCharge = elcCharge,
    ionCharge = ionCharge,
-   elcMass = electronMass,
+   elcMass = elcMass,
    ionMass = ionMass,
 }
 
@@ -967,28 +976,28 @@ function calcDiagnostics(curr, dt)
    runUpdater(copyCToDElc2D, 0.0, 0.0, {hamilKeElc}, {hamilKeElcDg})
    runUpdater(copyCToDIon2D, 0.0, 0.0, {hamilKeIon}, {hamilKeIonDg})
    -- compute moments at edges
-   runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilKeElcDg}, {momentsAtEdgesElc})
-   runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon, hamilKeIonDg}, {momentsAtEdgesIon})
+   runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilKeElcDg, aParallel1dDg}, {momentsAtEdgesElc})
+   runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon, hamilKeIonDg, aParallel1dDg}, {momentsAtEdgesIon})
    -- compute heat flux at edges
    runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc, momentsAtEdgesIon}, {heatFluxAtEdge})
 
    -- copy hamiltonian to DG field
-   runUpdater(copyCToDElc2D, curr, dt, {hamilElc}, {hamilElcDg})
-   runUpdater(copyCToDIon2D, curr, dt, {hamilIon}, {hamilIonDg})
+   --runUpdater(copyCToDElc2D, curr, dt, {hamilElc}, {hamilElcDg})
+   --runUpdater(copyCToDIon2D, curr, dt, {hamilIon}, {hamilIonDg})
    -- accumulate perpendicular energy terms
-   hamilElcDg:accumulate(1.0, hamilPerpElcDg)
-   hamilIonDg:accumulate(1.0, hamilPerpIonDg)
+   --hamilElcDg:accumulate(1.0, hamilPerpElcDg)
+   --hamilIonDg:accumulate(1.0, hamilPerpIonDg)
    -- compute energy using discrete hamiltonian
-   runUpdater(hamilElcEnergyCalc, curr, dt, {distfElc, hamilElcDg}, {hamilElcEnergy})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, hamilIonDg}, {hamilIonEnergy})
+   --runUpdater(hamilElcEnergyCalc, curr, dt, {distfElc, hamilElcDg}, {hamilElcEnergy})
+   --runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, hamilIonDg}, {hamilIonEnergy})
    -- need to divide by mass to get correct terms!!
    --
    -- compute source energy using discrete hamiltonian
-   runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
+   --runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
+   --runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
    
-   runUpdater(totalEnergyCalc, curr, dt, {heatFluxAtEdge, hamilElcEnergy, 
-    hamilIonEnergy, hamilSrcElcEnergy, hamilSrcIonEnergy}, {totalEnergy})
+   --runUpdater(totalEnergyCalc, curr, dt, {heatFluxAtEdge, hamilElcEnergy, 
+   -- hamilIonEnergy, hamilSrcElcEnergy, hamilSrcIonEnergy}, {totalEnergy})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -1144,7 +1153,7 @@ function advanceFrame(tStart, tEnd, initDt)
    return dtSuggested
 end
 
--- create updater to copy a continuous field to a discontinuous field
+-- create updater to copy a continuous 1D field to a 1D discontinuous field
 copyCToD = Updater.CopyContToDisCont1D {
    onGrid = grid_1d,
    basis = basis_1d,
@@ -1157,14 +1166,14 @@ end
 
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
-   --numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
-   --numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
+   numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
+   numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
    distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
    --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum) )
-   totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
+   --totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
    --momentumIon:write( string.format("mom1Ion_%d.h5", frameNum), tCurr)
    --momentumElc:write( string.format("mom1Elc_%d.h5", frameNum), tCurr)
    --mom3Ion:write( string.format("mom3Ion_%d.h5", frameNum), tCurr)

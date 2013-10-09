@@ -1,5 +1,5 @@
 -- Input file for ion acoustic problem with kinetic ions and electrons
--- Basic case
+-- Uses constant density in ions, cos(kx) perturbation in electrons
 
 -- polynomial order
 polyOrder = 2
@@ -10,47 +10,47 @@ cfl = 0.1
 -- wave-number
 knumber = 0.5
 
--- initial number density in each cell
-initNumDens = 1.0
+-- initial number density in each cell (1/m^3)
+initNumDens = 1.0e19
 -- temperature ratio (T_i/T_e)
-Tratio = 2.0
+Tratio = 0.25
 
 kPerpTimesRho = 0.2
+-- electron temperature (eV)
+elcTemp = 250
 -- ion temperature
-ionTemp = 1.0
--- electron temperature
-elcTemp = ionTemp/Tratio
+ionTemp = elcTemp*Tratio
 -- signed electron charge
-elcCharge = -1.0
+elcCharge = -Lucee.ElementaryCharge
 -- signed ion charge
-ionCharge = 1.0
+ionCharge = Lucee.ElementaryCharge
 -- electron mass
-elcMass = Lucee.ElectronMass/Lucee.ProtonMass
+elcMass = Lucee.ElectronMass
 -- ion mass
-ionMass = 1
+ionMass = Lucee.ProtonMass
 -- electron drift speed
 elcDrift = 0.0
 -- ion drift speed
 ionDrift = 0.0
 
 -- permittivity of free space
-epsilon0 = 1.0
+epsilon0 = Lucee.Epsilon0
 
 -- domain extents
 XL, XU = -Lucee.Pi/knumber, Lucee.Pi/knumber
 VL, VU = -6.0, 6.0
 -- number of cells
-NX, NV = 32, 32
+NX, NV = 16, 16
 -- compute max thermal speed to set velocity space extents
-vtElc = math.sqrt(elcTemp/elcMass)
+vtElc = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
 VL_ELC, VU_ELC = -6.0*vtElc, 6.0*vtElc
 
-vtIon = math.sqrt(ionTemp/ionMass)
+vtIon = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
 VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 5.0
+tEnd = 20e-5
 nFrames = 5
 
 -- Determine number of global nodes per cell for use in creating CG
@@ -129,9 +129,11 @@ initDistfElc = Updater.EvalOnNodes2D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(x,y,z,t)
-      local elcThermal = math.sqrt(elcTemp/elcMass)
+      local elcThermal = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
       local alpha = 0.01 -- perturbation
 		  local k = knumber
+		  --local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
+		  --  (1+kPerpTimesRho*kPerpTimesRho)
 		  local nHat = initNumDens*(1+alpha*math.cos(k*x))
 		  return maxwellian(nHat, elcDrift, elcThermal, y)
 	   end
@@ -146,10 +148,10 @@ initDistfIon = Updater.EvalOnNodes2D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(x,y,z,t)
-		 local ionThermal = math.sqrt(ionTemp/ionMass)
+		 local ionThermal = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
 		 local alpha = 0.01 -- perturbation
 		 local k = knumber
-		 return (1+alpha*math.cos(k*x))*maxwellian(initNumDens, ionDrift, ionThermal, y)
+		 return maxwellian(initNumDens, ionDrift, ionThermal, y)
 	  end
 }
 runUpdater(initDistfIon, 0.0, 0.0, {}, {distfIon})

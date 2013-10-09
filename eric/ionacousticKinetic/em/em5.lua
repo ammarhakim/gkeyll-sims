@@ -1,6 +1,7 @@
 -- Input file for ion acoustic problem with kinetic ions and electrons
 -- Electromagnetic terms added
--- Basic test case
+-- Basic test case.. using real units
+-- Velocity-dependent initialization in the electrons
 
 -- polynomial order
 polyOrder = 2
@@ -11,37 +12,37 @@ cfl = 0.1
 -- wave-number
 knumber = 0.5
 
--- initial number density in each cell
-initNumDens = 1.0
+-- initial number density in each cell (1/m^3)
+initNumDens = 1.0e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
 
 kPerpTimesRho = 0.2
--- ion temperature
-ionTemp = 1.0
--- electron temperature
-elcTemp = ionTemp/Tratio
+-- electron temperature (eV)
+elcTemp = 250
+-- ion temperature (eV)
+ionTemp = elcTemp*Tratio
 -- signed electron charge
-elcCharge = -1.0
+elcCharge = -Lucee.ElementaryCharge
 -- signed ion charge
-ionCharge = 1.0
+ionCharge = Lucee.ElementaryCharge
 -- electron mass
-elcMass = Lucee.ElectronMass/Lucee.ProtonMass
+elcMass = Lucee.ElectronMass
 -- ion mass
-ionMass = 1
+ionMass = Lucee.ProtonMass
 
 -- permittivity of free space
-epsilon0 = 1.0
+epsilon0 = Lucee.Epsilon0
 -- permeability of free space
-mu0 = 1.0
+mu0 = Lucee.Mu0
 -- Magnetic field (Tesla)
 B0 = 1.0
 
 -- Derived parameters
 -- Ion cyclotron frequency
-Omega_i = Lucee.ElementaryCharge*B0/Lucee.ProtonMass
+Omega_i = ionCharge*B0/ionMass
 -- Ion sound speed
-c_i = math.sqrt(250*Lucee.ElementaryCharge/Lucee.ProtonMass)
+c_i = math.sqrt(elcTemp*Lucee.ElementaryCharge/ionMass)
 -- Sound-based gyroradius
 rho_i = c_i/Omega_i
 -- k_perpendicular
@@ -50,18 +51,18 @@ kPerp = kPerpTimesRho/rho_i
 -- domain extents
 XL, XU = -Lucee.Pi/knumber, Lucee.Pi/knumber
 -- number of cells
-NX, NP = 32, 32
+NX, NP = 16, 16
 -- compute max thermal speed to set velocity space extents
-vtElc = math.sqrt(elcTemp/elcMass)
+vtElc = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
 PL_ELC, PU_ELC = -6.0*elcMass*vtElc, 6.0*elcMass*vtElc
 
-vtIon = math.sqrt(ionTemp/ionMass)
+vtIon = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
 PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 10.0
-nFrames = 5
+tEnd = 20e-5
+nFrames = 1
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -142,11 +143,12 @@ initDistfElc = Updater.EvalOnNodes2D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(x,y,z,t)
-      local elcThermal = math.sqrt(elcTemp/elcMass)
+      local elcThermal = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
       local alpha = 0.01 -- perturbation
 		  local k = knumber
-		  local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
-		    (1+kPerpTimesRho*kPerpTimesRho)
+		  --local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
+		  --  (1+kPerpTimesRho*kPerpTimesRho)
+		  local nHat = initNumDens*(1+alpha*math.cos(k*x)*y/elcThermal)
 		  return maxwellian(nHat, elcMass, elcThermal, y)
 	   end
 }
@@ -160,10 +162,10 @@ initDistfIon = Updater.EvalOnNodes2D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(x,y,z,t)
-		 local ionThermal = math.sqrt(ionTemp/ionMass)
+		 local ionThermal = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
 		 local alpha = 0.01 -- perturbation
 		 local k = knumber
-		 return (1+alpha*math.cos(k*x))*maxwellian(initNumDens, ionMass, ionThermal, y)
+		 return maxwellian(initNumDens, ionMass, ionThermal, y)
 	  end
 }
 runUpdater(initDistfIon, 0.0, 0.0, {}, {distfIon})
