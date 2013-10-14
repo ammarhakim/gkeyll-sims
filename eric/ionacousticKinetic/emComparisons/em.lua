@@ -1,7 +1,8 @@
 -- Input file for ion acoustic problem with kinetic ions and electrons
 -- Electromagnetic terms added
 -- Basic test case.. using real units
--- Initial condition minimizes omega_h
+-- Uses constant density for ions and perturbed density for electrons
+-- Evolves both ions and electrons
 
 -- polynomial order
 polyOrder = 2
@@ -17,7 +18,7 @@ initNumDens = 1.0e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
 
-kPerpTimesRho = 0.2
+kPerpTimesRho = 0.1
 -- electron temperature (eV)
 elcTemp = 250
 -- ion temperature (eV)
@@ -61,7 +62,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 20e-5
+tEnd = 5e-5
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -144,10 +145,9 @@ initDistfElc = Updater.EvalOnNodes2D {
    -- function to use for initialization
    evaluate = function(x,y,z,t)
       local elcThermal = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
-      local alpha = 0.01 -- perturbation
+      local alpha = 1e-6 -- perturbation
 		  local k = knumber
-		  local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
-		    (1+kPerpTimesRho*kPerpTimesRho)
+		  local nHat = initNumDens*(1+alpha*math.cos(k*x))
 		  return maxwellian(nHat, elcMass, elcThermal, y)
 	   end
 }
@@ -162,9 +162,7 @@ initDistfIon = Updater.EvalOnNodes2D {
    -- function to use for initialization
    evaluate = function(x,y,z,t)
 		 local ionThermal = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
-		 local alpha = 0.01 -- perturbation
-		 local k = knumber
-		 return (1+alpha*math.cos(k*x))*maxwellian(initNumDens, ionMass, ionThermal, y)
+		 return maxwellian(initNumDens, ionMass, ionThermal, y)
 	  end
 }
 runUpdater(initDistfIon, 0.0, 0.0, {}, {distfIon})

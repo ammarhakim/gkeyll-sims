@@ -60,7 +60,7 @@ Sn   = A*nPed*cPed/lSource
 -- domain extents
 XL, XU = -lParallel, lParallel
 -- number of cells
-NX, NP = 16, 16
+NX, NP = 32, 32
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(tPed*eV/elcMass)
 PL_ELC, PU_ELC = -6.0*elcMass*vtElc, 6.0*elcMass*vtElc
@@ -70,7 +70,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 200.0e-6
+tEnd = 300.0e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -1180,6 +1180,7 @@ function writeFields(frameNum, tCurr)
    --mom3Elc:write( string.format("mom3Elc_%d.h5", frameNum), tCurr)
    calcDiscontinuousField(0.0, 0.0, phi1d, phi1dDg)
    phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   aParallel1dDg:write(string.format("a_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)

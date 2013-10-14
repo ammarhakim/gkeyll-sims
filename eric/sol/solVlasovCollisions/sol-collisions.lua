@@ -245,7 +245,7 @@ lbDragSlvr = Updater.LenardBernsteinDragUpdater2D {
   epsilon0 = epsilon0,
 }
 
--- updater for L-B drag term
+-- updater for L-B diffusion term
 lbDiffSlvr = Updater.LenardBernsteinDiffUpdater2D {
   onGrid = grid,
   -- basis functions to use
