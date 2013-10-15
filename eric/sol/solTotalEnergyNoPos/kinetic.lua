@@ -1,6 +1,6 @@
 -- Input file for SOL problem with kinetic ions and electrons
 -- This test has positivty preservation turned off
--- polyOrder = 1 and kPerpRho = 0.2
+-- polyOrder 1, kPerpRho 0.2
 
 -- polynomial order
 polyOrder = 1
