@@ -615,6 +615,7 @@ electrostaticPhiCalc = Updater.ElectrostaticContPhiUpdater {
    basis = basis_1d,
    kPerpTimesRho = kPerpTimesRho,
    Te0 = Te0,
+   useCutoffVelocities = true,
 }
 
 -- updater to copy 1D field to 2D field
