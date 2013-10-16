@@ -615,6 +615,7 @@ electrostaticPhiCalc = Updater.ElectrostaticPhiUpdater {
    basis = basis_1d,
    kPerpTimesRho = kPerpTimesRho,
    Te0 = Te0,
+   useCutoffVelocities = true,
 }
 
 -- updater to copy 1D field to 2D field
@@ -955,6 +956,7 @@ function writeFields(frameNum, tCurr)
    distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
+   cutoffVelocities:write( string.format("cutoffVelocities_%d.h5", frameNum) ,tCurr)
    totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
    copyPotential(0.0, 0.0, phi1d, phi1dDg)
    phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
