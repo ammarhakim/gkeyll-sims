@@ -146,11 +146,6 @@ initDistfElc = Updater.EvalOnNodes2D {
    -- function to use for initialization
    evaluate = function(x,y,z,t)
       local elcThermal = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
-      local alpha = 1e-6 -- perturbation
-		  local k = knumber
-		  --local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
-		  --  (1+kPerpTimesRho*kPerpTimesRho)
-		  local nHat = initNumDens*(1+alpha*math.cos(k*x))
 		  return maxwellian(initNumDens, elcMass, elcThermal, y)
 	   end
 }
