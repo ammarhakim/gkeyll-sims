@@ -24,7 +24,7 @@ ionTemp = 1.0
 elcTemp = ionTemp/Tratio
 -- signed ion charge
 ionCharge = 1.0
--- electron mass
+-- ion mass
 ionMass = 1.0
 -- permittivity of free space
 epsilon0 = 1.0

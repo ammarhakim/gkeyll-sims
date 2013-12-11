@@ -1,5 +1,5 @@
 ** Welcome to Lucee!
-Simulation started at time Fri Aug  2 15:22:20 2013
+Simulation started at time Tue Nov 19 16:12:24 2013
 
 Setting up object of type Grid::RectCart2D ...
 Setting up object of type NodalFiniteElement2D::SerendipityElement ...
@@ -60,5 +60,5 @@ Setting up object of type Updater::NormGrad1D ...
 
 -- Advancing solution from 18 to 20
 
-Simulation took 76.45 seconds and finished at time Fri Aug  2 15:23:44 2013
+Simulation took 84.0895 seconds and finished at time Tue Nov 19 16:13:51 2013
 
