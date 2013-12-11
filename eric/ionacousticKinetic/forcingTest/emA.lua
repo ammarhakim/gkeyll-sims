@@ -1,12 +1,8 @@
--- Input file for ion acoustic problem with kinetic ions and electrons
--- Electromagnetic terms added
--- Basic test case.. using real units
--- Uses constant density for ions and perturbed density for electrons
--- Ions are stationary in this test
--- Continuous Phi and A
+-- Tests A_parallel implementation by using phi zero, A nonzero
+-- that gives same resulting E-field as emPhi.lua
 
 -- polynomial order
-polyOrder = 2
+polyOrder = 1
 
 -- cfl number to use
 cfl = 0.1
@@ -63,7 +59,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-8
+tEnd = 1e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -474,6 +470,12 @@ aParallel1dDg = DataStruct.Field1D {
    ghost = {1, 1},
 }
 
+aParallelOut1dDg = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+
 aParallel2dDg = DataStruct.Field2D {
    onGrid = gridElc,
    numComponents = basisElc:numNodes(),
@@ -714,6 +716,28 @@ totalIonEnergyCalc = Updater.KineticEnergyUpdater {
    basis = basisIon,
 }
 
+-- Updater to compute aParallel
+electromagneticACalc = Updater.ElectromagneticAForcingUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+  kPerp = kPerp,
+  elcMass = elcMass,
+  ionMass = ionMass,
+  elcCharge = elcCharge,
+  ionCharge = ionCharge,
+  mu0 = mu0,
+}
+
+-- updater to compute phi electrostatically
+electrostaticPhiCalc = Updater.ElectrostaticPhiUpdater {
+  -- grid for updater
+   onGrid = grid_1d,
+   -- basis functions to use
+   basis = basis_1d,
+   kPerpTimesRho = kPerpTimesRho,
+   Te0 = elcTemp,
+}
+
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi1d}, {fieldEnergy})
@@ -728,6 +752,12 @@ function calcDiagnostics(curr, dt)
   copyCont1DTo2D(copyTo2DElc, curr, dt, aParallel1d, aParallel2dElc)
   runUpdater(copyCToDElc2D, curr, dt, {aParallel2dElc}, {aParallel2dDg})
   runUpdater(copyCToDElc2D, curr, dt, {aTimesPElc}, {aTimesPElcDg})
+
+  -- Calculate resulting A_par
+  runUpdater(electromagneticACalc, curr, dt, {mom0Elc, mom0Ion, mom1Elc, mom1Ion, aParallel1dDg}, {aParallelOut1dDg})
+
+  -- Calculate resulting phi
+  runUpdater(electrostaticPhiCalc, curr, dt, {numDensityElc, numDensityIon}, {phi1dDg}) 
 end
 
 forcePhiUpdater = Updater.EvalOnNodes1D {
@@ -753,7 +783,8 @@ forceAUpdater = Updater.EvalOnNodes1D {
       local alpha = 1e-7 -- perturbation
       local phi_1 = alpha*elcTemp
 		  local k = knumber
-		  return -phi_1*k*t*math.sin(k*x)
+		  local theta = 0
+		  return -phi_1*k*t*math.sin(k*x + theta)
 	   end
 }
 
@@ -764,9 +795,9 @@ function rk3(tCurr, myDt)
 
    -- RK stage 1
    statusElc, dtSuggestedElc = updateVlasovEqn(vlasovSolverElc, tCurr, myDt, distfElc, hamilElc, distf1Elc)
-   distf1Ion:copy(distfIon)
-   if (statusElc == false) then
-      return false, dtSuggestedElc
+   statusIon, dtSuggestedIon = updateVlasovEqn(vlasovSolverIon, tCurr, myDt, distfIon, hamilIon, distf1Ion)
+   if (statusElc == false) or (statusIon == false) then
+      return false, math.min(dtSuggestedElc, dtSuggestedIon)
    end
    applyBc(tCurr, myDt, distf1Elc, distf1Ion)
 
@@ -786,9 +817,9 @@ function rk3(tCurr, myDt)
 
    -- RK stage 2
    statusElc, dtSuggestedElc = updateVlasovEqn(vlasovSolverElc, tCurr, myDt, distf1Elc, hamilElc, distfNewElc)
-   distfNewIon:copy(distf1Ion)
-   if (statusElc == false) then
-      return false, dtSuggestedElc
+   statusIon, dtSuggestedIon = updateVlasovEqn(vlasovSolverIon, tCurr, myDt, distf1Ion, hamilIon, distfNewIon)
+   if (statusElc == false) or (statusIon == false) then
+      return false, math.min(dtSuggestedElc, dtSuggestedIon)
    end
    distf1Elc:combine(3.0/4.0, distfElc, 1.0/4.0, distfNewElc)
    distf1Ion:combine(3.0/4.0, distfIon, 1.0/4.0, distfNewIon)
@@ -811,9 +842,9 @@ function rk3(tCurr, myDt)
 
    -- RK stage 3
    statusElc, dtSuggestedElc = updateVlasovEqn(vlasovSolverElc, tCurr, myDt, distf1Elc, hamilElc, distfNewElc)
-   distfNewIon:copy(distf1Ion)
-   if (statusElc == false) then
-      return false, dtSuggestedElc
+   statusIon, dtSuggestedIon = updateVlasovEqn(vlasovSolverIon, tCurr, myDt, distf1Ion, hamilIon, distfNewIon)
+   if (statusElc == false) or (statusIon == false) then
+      return false, math.min(dtSuggestedElc, dtSuggestedIon)
    end
    distf1Elc:combine(1.0/3.0, distfElc, 2.0/3.0, distfNewElc)
    distf1Ion:combine(1.0/3.0, distfIon, 2.0/3.0, distfNewIon)
@@ -905,13 +936,14 @@ function writeFields(frameNum, tCurr)
   numDensityElc:write(string.format("numDensityElc_%d.h5", frameNum), tCurr)
   numDensityIon:write(string.format("numDensityIon_%d.h5", frameNum), tCurr)
 
-  --mom1Elc:write(string.format("mom1Elc_%d.h5", frameNum), tCurr)
-  --mom1Ion:write(string.format("mom1Ion_%d.h5", frameNum), tCurr)
+  mom1Elc:write(string.format("mom1Elc_%d.h5", frameNum), tCurr)
+  mom1Ion:write(string.format("mom1Ion_%d.h5", frameNum), tCurr)
 
-  calcDiscontinuousField(0.0, 0.0, phi1d, phi1dDg)
+  --calcDiscontinuousField(0.0, 0.0, phi1d, phi1dDg)
   phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
 
   aParallel1dDg:write(string.format("a_%d.h5", frameNum), tCurr)
+  aParallelOut1dDg:write(string.format("aOut_%d.h5", frameNum), tCurr)
   aParallel2dDg:write(string.format("a2d_%d.h5", frameNum), tCurr)
   aSquared1dDg:write(string.format("aSquared_%d.h5", frameNum), tCurr)
   aTimesPElcDg:write(string.format("aTimesP_%d.h5", frameNum), tCurr)
