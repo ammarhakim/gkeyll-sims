@@ -20,7 +20,7 @@ ionCharge = Lucee.ElementaryCharge
 
 -- physical input parameters
 
-kPerpTimesRho = 0.2
+kPerpTimesRho = 0.3
 -- pedestal density (1/m^3)
 nPed = 5e19
 -- pedestal (source) temperature (eV)
@@ -66,7 +66,7 @@ VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 100.0e-6
+tEnd = 350.0e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -713,47 +713,12 @@ function calcHamiltonianElc(curr, dt, phiIn, hamilOut)
    hamilOut:scale(-Lucee.ElementaryCharge/electronMass)
    hamilOut:accumulate(1.0, hamilKeElc)
 end
-
--- to compute second order hamiltonian term
-mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
-  onGrid = grid_1d,
-  basis = basis_1d,
-}
--- store result of mhdHamiltonianCalc
-mhdHamiltonian1dDg = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numNodes(),
-   ghost = {1, 1},
-}
--- result of mhdHamiltonianCalc as continuous field
-mhdHamiltonian1d = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numExclusiveNodes(),
-   ghost = {1, 1},
-   -- write ghosts
-   writeGhost = {0, 1},
-}
-mhdHamiltonian2d = DataStruct.Field2D {
-   onGrid = gridIon,
-   numComponents = basisIon:numExclusiveNodes(),
-   ghost = {1, 1},
-   -- ghost cells to write
-   writeGhost = {0, 1} -- write extra layer on right to get nodes
-}
-
 -- compute hamiltonian for ions
 function calcHamiltonianIon(curr, dt, phiIn, hamilOut)
    hamilOut:clear(0.0)
    copyPhi(copyTo2DIon, curr, dt, phiIn, hamilOut)
    hamilOut:scale(ionCharge/ionMass)
    hamilOut:accumulate(1.0, hamilKeIon)
-
-   -- compute second order hamiltonian term
-   runUpdater(copyCToD, curr, dt, {phiIn}, {phi1dDg})
-   runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
-   runUpdater(phiToContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
-   runUpdater(copyTo2DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian2d})
-   hamilOut:accumulate(kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/(Te0*ionMass), mhdHamiltonian2d)
 end
 
 -- A HACK
@@ -995,7 +960,6 @@ function writeFields(frameNum, tCurr)
    totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
    copyPotential(0.0, 0.0, phi1d, phi1dDg)
    phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
-   mhdHamiltonian1dDg:write(string.format("mhdHamiltonian_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
