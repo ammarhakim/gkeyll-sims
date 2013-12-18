@@ -163,8 +163,6 @@ initDistfIon = Updater.EvalOnNodes2D {
    -- function to use for initialization
    evaluate = function(x,y,z,t)
 		 local ionThermal = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
-		 local alpha = 0.01 -- perturbation
-		 local k = knumber
 		 return maxwellian(initNumDens, ionMass, ionThermal, y)
 	  end
 }
