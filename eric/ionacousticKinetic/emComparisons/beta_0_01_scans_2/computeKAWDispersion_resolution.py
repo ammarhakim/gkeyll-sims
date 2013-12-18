@@ -53,8 +53,13 @@ for index, tSim in enumerate(tSimList):
   # Divide by 2 to compare with wave freq
   omegaSim[index] = 0.5*(2*pi/tSim)/(kPar*B/sqrt(mu0*nSim*m_i))
 
+# For the data at 64
+t64Sim = 4.020e-7
+omega64Sim = 0.5*(2*pi/t64Sim)/(kPar*B/sqrt(mu0*nSim*m_i))
+
 plt.plot(vResList, exactFreqList,'b-o',label='Exact')
 plt.plot(vResList, omegaSim,'r-o',label='16X')
+plt.plot(64, omega64Sim, 'g-*', label='64X')
 
 plt.xlabel('Total P-Space Cells')
 plt.ylabel(r'$\omega/(k_\parallel v_A)$')
