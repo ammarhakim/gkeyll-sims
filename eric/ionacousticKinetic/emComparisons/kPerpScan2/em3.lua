@@ -13,6 +13,7 @@ cfl = 0.1
 knumber = 0.5
 
 -- initial number density in each cell (1/m^3)
+-- Corresponds to beta_e of 0.01
 initNumDens = 9.947e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
@@ -51,7 +52,7 @@ kPerp = kPerpTimesRho/rho_i
 -- domain extents
 XL, XU = -Lucee.Pi/knumber, Lucee.Pi/knumber
 -- number of cells
-NX, NP = 16, 16
+NX, NP = 16, 32
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
 PL_ELC, PU_ELC = -6.0*elcMass*vtElc, 6.0*elcMass*vtElc
@@ -146,8 +147,6 @@ initDistfElc = Updater.EvalOnNodes2D {
       local elcThermal = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
       local alpha = 1e-6 -- perturbation
 		  local k = knumber
-		  --local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
-		  --  (1+kPerpTimesRho*kPerpTimesRho)
 		  local nHat = initNumDens*(1+alpha*math.cos(k*x))
 		  return maxwellian(nHat, elcMass, elcThermal, y)
 	   end
@@ -163,8 +162,6 @@ initDistfIon = Updater.EvalOnNodes2D {
    -- function to use for initialization
    evaluate = function(x,y,z,t)
 		 local ionThermal = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
-		 local alpha = 0.01 -- perturbation
-		 local k = knumber
 		 return maxwellian(initNumDens, ionMass, ionThermal, y)
 	  end
 }
