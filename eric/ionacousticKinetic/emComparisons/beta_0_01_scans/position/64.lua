@@ -13,12 +13,12 @@ cfl = 0.1
 knumber = 0.5
 
 -- initial number density in each cell (1/m^3)
--- Corresponds to beta_e of 0.1
-initNumDens = 9.947e20
+-- Corresponds to beta_e of 0.01
+initNumDens = 9.947e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
 
-kPerpTimesRho = 0.6
+kPerpTimesRho = 0.2
 -- electron temperature (eV)
 elcTemp = 250
 -- ion temperature (eV)
@@ -52,7 +52,7 @@ kPerp = kPerpTimesRho/rho_i
 -- domain extents
 XL, XU = -Lucee.Pi/knumber, Lucee.Pi/knumber
 -- number of cells
-NX, NP = 16, 64
+NX, NP = 64, 64
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
 PL_ELC, PU_ELC = -6.0*elcMass*vtElc, 6.0*elcMass*vtElc
@@ -62,7 +62,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 6e-5
+tEnd = 3e-5
 nFrames = 1
 
 -- A generic function to run an updater.
