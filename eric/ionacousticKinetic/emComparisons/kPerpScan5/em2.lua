@@ -62,7 +62,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 3e-5
+tEnd = 6e-5
 nFrames = 1
 
 -- A generic function to run an updater.
