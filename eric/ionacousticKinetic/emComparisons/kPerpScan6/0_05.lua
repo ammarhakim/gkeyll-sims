@@ -7,7 +7,7 @@
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.1
+cfl = 0.05
 
 -- wave-number
 knumber = 0.5

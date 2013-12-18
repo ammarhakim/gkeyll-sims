@@ -18,7 +18,7 @@ initNumDens = 9.947e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
 
-kPerpTimesRho = 0.01
+kPerpTimesRho = 0.05
 -- electron temperature (eV)
 elcTemp = 250
 -- ion temperature (eV)
