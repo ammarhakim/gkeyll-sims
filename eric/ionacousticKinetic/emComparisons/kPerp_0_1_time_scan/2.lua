@@ -7,18 +7,18 @@
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.001
+cfl = 0.01
 
 -- wave-number
 knumber = 0.5
 
 -- initial number density in each cell (1/m^3)
--- Corresponds to beta_e of 0.1
+-- Corresponds to beta_e of 0.01
 initNumDens = 9.947e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
 
-kPerpTimesRho = 0.01
+kPerpTimesRho = 0.1
 -- electron temperature (eV)
 elcTemp = 250
 -- ion temperature (eV)
