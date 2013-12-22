@@ -66,7 +66,7 @@ VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 100.0e-6
+tEnd = 350.0e-6
 nFrames = 5
 
 -- A generic function to run an updater.

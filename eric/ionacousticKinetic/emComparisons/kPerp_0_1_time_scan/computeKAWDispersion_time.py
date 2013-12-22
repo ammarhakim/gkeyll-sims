@@ -29,7 +29,7 @@ eV = 1.602176565e-19
 
 tol = 1e-8
 
-kPerpRho = 0.01
+kPerpRho = 0.1
 nSim = 9.947e19
 
 beta_e = 2*mu0*Te0*eV*nSim/B**2
@@ -45,7 +45,7 @@ exactFreqList = [exactFreq, exactFreq, exactFreq]
 
 # Data measured from simulation
 cflList = [0.01, 0.001, 0.0001]
-tSimList = [4.020e-7, 4.006e-7, 4.006e-7]
+tSimList = [2.343682e-6, 2.343678e-6, 2.343677e-6]
 omegaSim = zeros(len(cflList))
 # Compute normalized simulation frequencies
 for index, tSim in enumerate(tSimList):
@@ -53,25 +53,15 @@ for index, tSim in enumerate(tSimList):
   # Divide by 2 to compare with wave freq
   omegaSim[index] = 0.5*(2*pi/tSim)/(kPar*B/sqrt(mu0*nSim*m_i))
 
-lns1 = plt.semilogx(cflList, omegaSim,'r-o',label='Sim')
+plt.semilogx(cflList, omegaSim,'r-o',label='Sim')
+plt.semilogx(cflList, exactFreqList,'b-o',label='Exact')
+
 plt.ylabel(r'$\omega/(k_\parallel v_A)$', color='r')
 plt.xlabel('CFL Number')
-for tl in plt.gca().get_yticklabels():
-  tl.set_color('r')
-
-
-ax2 = plt.gca().twinx()
-lns2 = ax2.semilogx(cflList, exactFreqList,'b-o',label='Exact')
-#ax2.set_ylabel(r'$\omega/(k_\parallel v_A)$', color='b')
-for tl in ax2.get_yticklabels():
-  tl.set_color('b')
-
-lns = lns1 + lns2
-labs = [l.get_label() for l in lns]
-plt.legend(lns, labs, loc='upper right')
-plt.title(r'Time Step Scan for $k_\perp \rho_s$=0.01, $\beta_e$=0.01')
+plt.legend(loc='right')
+plt.title(r'Time Step Scan for $k_\perp \rho_s$=0.1, $\beta_e$=0.01')
 #plt.ylim([0,8])
 #plt.autoscale(enable=True,axis='y',tight=True)
-plt.savefig('kaw_0_01_time.pdf')
+plt.savefig('kaw_0_1_time.pdf')
 plt.show()
 #plt.close()
