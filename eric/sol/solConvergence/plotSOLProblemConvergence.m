@@ -3,11 +3,11 @@ function plotSOLProblemConvergence
     close all
     clear
     
-    pathBase = '/Users/dark1egion/Research/Gkeyll-Project/gkeyllall/gkeyll-tests/gkeyll-tests/tests/slvrs/solVlasovConvergence/';
+    pathBase = '/Users/eshi/Research/gkeyllall/gkeyll-sims/eric/sol/solConvergence/';
     filenumEnd = 1;
     titles = {'Total Heat Flux', 'Ions + Electrons'};
     
-    xSizes = {'16','32','64','128'};
+    xSizes = {'16','32'};
     vSizes = {'32'};
     filenames1D = cell(1, length(xSizes)*length(vSizes));
     legendNames = cell(1, length(xSizes)*length(vSizes));
@@ -43,7 +43,7 @@ function plotSOLProblemConvergence
             % Loop over rest
             hold on
             if dataIndex == 2
-                % Total only
+                % Total only, every file
                 for fileIndex = 2:size(filenames1D,2)
                     semilogx(plotCell1D{fileIndex}(:,1).*1e6,plotCell1D{fileIndex}(:,dataIndex),...
                         colors{mod(fileIndex-1,length(colors))+1},'LineWidth',1.5)
@@ -55,6 +55,7 @@ function plotSOLProblemConvergence
                         colors{mod(fileIndex-1,length(colors))+1},'LineWidth',1.5)
                 end
                 
+                semilogx(plotCell1D{1}(:,1).*1e6,plotCell1D{1}(:,dataIndex+1),'r','LineWidth',1.5)
                 for fileIndex = 2:size(filenames1D,2)
                     semilogx(plotCell1D{fileIndex}(:,1).*1e6,plotCell1D{fileIndex}(:,dataIndex+1),...
                         colors{mod(fileIndex-1,length(colors))+1},'LineWidth',1.5)
