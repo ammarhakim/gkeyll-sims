@@ -6,14 +6,17 @@ function plotSOLProblemConvergence
     pathBase = '/Users/eshi/Research/gkeyllall/gkeyll-sims/eric/sol/solConvergence/';
     filenumEnd = 1;
     titles = {'Total Heat Flux', 'Ions + Electrons'};
+    outputTitles = {'total','separate'};
     
-    xSizes = {'16','32'};
+    xSizes = {'8','16','32'};
     vSizes = {'32'};
     filenames1D = cell(1, length(xSizes)*length(vSizes));
     legendNames = cell(1, length(xSizes)*length(vSizes));
     dataName = 'heatFluxAtEdge';
+    
+    writeFigures = true
  
-    colors = {'r','b','m','k','c','g', 'y'};
+    colors = {'r','b','g','k','c','m', 'y'};
     
     % Generate list of filenames
     for xIndex = 1:length(xSizes)
@@ -63,13 +66,18 @@ function plotSOLProblemConvergence
             end
             hold off
             
-            ylim([0 5e9])
-            xlim([0.01 1000])
+            ylim([0 6e9])
+            xlim([0.5 400])
             grid on
             legend(legendNames)
             xlabel('t (\mu s)')
             ylabel('Q (W/m^2)')
             title(titles{dataIndex-1})
+            if writeFigures == true
+                set(gcf, 'PaperPosition', [0 0 10 8]); % Position plot at left hand corner with width 7 and height 5.
+                set(gcf, 'PaperSize', [10 8]); % Set the paper to have width 7 and height 5.
+                saveas(gcf, [pathBase,dataName,'_',outputTitles{dataIndex-1},'.pdf'], 'pdf')
+            end
         end
     end
 end

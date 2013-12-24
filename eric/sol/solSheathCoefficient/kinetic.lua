@@ -56,7 +56,7 @@ Sn   = A*nPed*cPed/lSource
 -- domain extents
 XL, XU = -lParallel, lParallel
 -- number of cells
-NX, NV = 32, 32
+NX, NV = 8, 32
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(tPed*eV/electronMass)
 VL_ELC, VU_ELC = -6.0*vtElc, 6.0*vtElc
@@ -66,7 +66,7 @@ VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 300.0e-6
+tEnd = 350.0e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -655,7 +655,7 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdgesUpdater {
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
 -- dynvector for sheath power transmission coefficients
-sheathCoefficients = DataStruct.DynVector { numComponents = 1, }
+sheathCoefficients = DataStruct.DynVector { numComponents = 3, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
@@ -791,7 +791,7 @@ end
 
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
-   copyPotential(0.0, 0.0, phi1d, phi1dDg)
+   --copyPotential(0.0, 0.0, phi1d, phi1dDg)
 
    -- compute moments at edges
    runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilKeElcDg}, {momentsAtEdgesElc})
@@ -805,21 +805,22 @@ function calcDiagnostics(curr, dt)
    -- Accumulate to hamiltonians to get 0.5*q/m*phi
    --hamilElc:accumulate(0.5*Lucee.ElementaryCharge/electronMass, phi2dElc)
    --hamilIon:accumulate(-0.5*ionCharge/ionMass, phi2dIon)
-   -- copy hamiltonian to DG field
-   runUpdater(copyCToDElc2D, curr, dt, {hamilElc}, {hamilElcDg})
-   runUpdater(copyCToDIon2D, curr, dt, {hamilIon}, {hamilIonDg})
-   -- accumulate perpendicular energy terms
-   hamilElcDg:accumulate(1.0, hamilPerpElcDg)
-   hamilIonDg:accumulate(1.0, hamilPerpIonDg)
-   -- compute energy using discrete hamiltonian
-   runUpdater(hamilElcEnergyCalc, curr, dt, {distfElc, hamilElcDg}, {hamilElcEnergy})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, hamilIonDg}, {hamilIonEnergy})
-   -- compute source energy using discrete hamiltonian
-   runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
    
-   runUpdater(totalEnergyCalc, curr, dt, {heatFluxAtEdge, hamilElcEnergy, 
-    hamilIonEnergy, hamilSrcElcEnergy, hamilSrcIonEnergy}, {totalEnergy})
+   -- copy hamiltonian to DG field
+   --runUpdater(copyCToDElc2D, curr, dt, {hamilElc}, {hamilElcDg})
+   --runUpdater(copyCToDIon2D, curr, dt, {hamilIon}, {hamilIonDg})
+   -- accumulate perpendicular energy terms
+   --hamilElcDg:accumulate(1.0, hamilPerpElcDg)
+   --hamilIonDg:accumulate(1.0, hamilPerpIonDg)
+   -- compute energy using discrete hamiltonian
+   --runUpdater(hamilElcEnergyCalc, curr, dt, {distfElc, hamilElcDg}, {hamilElcEnergy})
+   --runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, hamilIonDg}, {hamilIonEnergy})
+   -- compute source energy using discrete hamiltonian
+   --runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
+   --runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
+   
+   --runUpdater(totalEnergyCalc, curr, dt, {heatFluxAtEdge, hamilElcEnergy, 
+   -- hamilIonEnergy, hamilSrcElcEnergy, hamilSrcIonEnergy}, {totalEnergy})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -964,13 +965,13 @@ function writeFields(frameNum, tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
    --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum) )
-   totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
+   --totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
    --momentumIon:write( string.format("mom1Ion_%d.h5", frameNum), tCurr)
    --momentumElc:write( string.format("mom1Elc_%d.h5", frameNum), tCurr)
    --mom3Ion:write( string.format("mom3Ion_%d.h5", frameNum), tCurr)
    --mom3Elc:write( string.format("mom3Elc_%d.h5", frameNum), tCurr)
-   copyPotential(0.0, 0.0, phi1d, phi1dDg)
-   phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   --copyPotential(0.0, 0.0, phi1d, phi1dDg)
+   --phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
