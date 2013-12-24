@@ -1,6 +1,6 @@
 -- Input file for SOL problem with kinetic ions and electrons
--- This test has positivty preservation turned off
 -- PolyOrder 2 and kPerp = 0.2
+-- This is a 'barebones' run that only computes heat flux at edges
 
 -- polynomial order
 polyOrder = 2
