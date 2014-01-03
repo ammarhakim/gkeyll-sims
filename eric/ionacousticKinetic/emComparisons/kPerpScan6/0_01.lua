@@ -496,6 +496,7 @@ copyTo2DElcDg = Updater.NodalCopyFaceToInteriorUpdater {
 
 -- function to copy 1D field to 2D field
 function copyCont1DTo2D(copier, curr, dt, phi1, phi2)
+   phi2:clear(0.0)
    return runUpdater(copier, curr, dt, {phi1}, {phi2})
 end
 
@@ -843,6 +844,7 @@ copyCToD = Updater.CopyContToDisCont1D {
 
 -- Copy a continuous field to a discontinuous field
 function calcDiscontinuousField(tCurr, dt, cgIn, dgOut)
+   dgOut:clear(0.0)
    runUpdater(copyCToD, tCurr, dt, {cgIn}, {dgOut})
 end
 
