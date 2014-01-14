@@ -3,7 +3,7 @@
 -- PolyOrder 2 and kPerp = 0.2
 
 -- polynomial order
-polyOrder = 1
+polyOrder = 2
 
 -- cfl number to use
 cfl = 0.1
@@ -66,7 +66,7 @@ VL_ION, VU_ION = -6.0*vtIon, 6.0*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 300.0e-6
+tEnd = 350.0e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -615,6 +615,7 @@ electrostaticPhiCalc = Updater.ElectrostaticPhiUpdater {
    basis = basis_1d,
    kPerpTimesRho = kPerpTimesRho,
    Te0 = Te0,
+   useCutoffVelocities = true,
 }
 
 -- updater to copy 1D field to 2D field
@@ -952,18 +953,11 @@ end
 
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
-   --numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
-   --numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
    distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
-   --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
-   --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum) )
+   cutoffVelocities:write( string.format("cutoffVelocities_%d.h5", frameNum) ,tCurr)
    totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
-   --momentumIon:write( string.format("mom1Ion_%d.h5", frameNum), tCurr)
-   --momentumElc:write( string.format("mom1Elc_%d.h5", frameNum), tCurr)
-   --mom3Ion:write( string.format("mom3Ion_%d.h5", frameNum), tCurr)
-   --mom3Elc:write( string.format("mom3Elc_%d.h5", frameNum), tCurr)
    copyPotential(0.0, 0.0, phi1d, phi1dDg)
    phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
 end
