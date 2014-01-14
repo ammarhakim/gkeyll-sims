@@ -2,8 +2,6 @@
 -- Electromagnetic terms added
 -- Basic test case.. using real units
 -- Uses constant density for ions and perturbed density for electrons
--- Ions are stationary in this test
--- Also writes out Aparallel before being projected to continuous basis
 
 -- polynomial order
 polyOrder = 2
@@ -15,11 +13,12 @@ cfl = 0.1
 knumber = 0.5
 
 -- initial number density in each cell (1/m^3)
-initNumDens = 1.0e19
+-- Corresponds to beta_e of 0.01
+initNumDens = 9.947e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
 
-kPerpTimesRho = 0.1
+kPerpTimesRho = 0.2
 -- electron temperature (eV)
 elcTemp = 250
 -- ion temperature (eV)
@@ -53,7 +52,7 @@ kPerp = kPerpTimesRho/rho_i
 -- domain extents
 XL, XU = -Lucee.Pi/knumber, Lucee.Pi/knumber
 -- number of cells
-NX, NP = 16, 16
+NX, NP = 16, 32
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
 PL_ELC, PU_ELC = -6.0*elcMass*vtElc, 6.0*elcMass*vtElc
@@ -63,8 +62,8 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-5
-nFrames = 5
+tEnd = 2e-5
+nFrames = 1
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -459,7 +458,7 @@ electromagneticACalc = Updater.ElectromagneticAUpdater {
   elcMass = elcMass,
   ionMass = ionMass,
   elcCharge = elcCharge,
-  ionCharge = ionCharge,
+  ionCharge = 0,
   mu0 = mu0,
 }
 
@@ -701,8 +700,8 @@ totalIonEnergyCalc = Updater.KineticEnergyUpdater {
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi1d}, {fieldEnergy})
-  runUpdater(totalElcEnergyCalc, curr, dt, {distfElc, hamilElc}, {totalElcEnergy})
-  runUpdater(totalIonEnergyCalc, curr, dt, {distfIon, hamilIon}, {totalIonEnergy})
+  --runUpdater(totalElcEnergyCalc, curr, dt, {distfElc, hamilElc}, {totalElcEnergy})
+  --runUpdater(totalIonEnergyCalc, curr, dt, {distfIon, hamilIon}, {totalIonEnergy})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -779,8 +778,6 @@ function rk3(tCurr, myDt)
    -- Compute A-parallel
    runUpdater(electromagneticACalc, tCurr, myDt, {mom0Elc, mom0Ion, mom1Elc, mom1Ion}, {aParallel1dDg})
    calcContinuous1dField(tCurr, myDt, aParallel1dDg, aParallel1d)
-   -- Copy for diagnostic purposes
-   aParallel1dDgDup:copy(aParallel1dDg)
    -- Copy continuous field back to discontinuous field
    calcDiscontinuousField(tCurr, myDt, aParallel1d, aParallel1dDg)
    -- Compute projection of A(x)^2
@@ -857,14 +854,10 @@ function writeFields(frameNum, tCurr)
   --numDensityElc:write(string.format("numDensityElc_%d.h5", frameNum), tCurr)
   --numDensityIon:write(string.format("numDensityIon_%d.h5", frameNum), tCurr)
 
-  --mom1Elc:write(string.format("mom1Elc_%d.h5", frameNum), tCurr)
-  --mom1Ion:write(string.format("mom1Ion_%d.h5", frameNum), tCurr)
+  --calcDiscontinuousField(0.0, 0.0, phi1d, phi1dDg)
+  --phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
 
-  calcDiscontinuousField(0.0, 0.0, phi1d, phi1dDg)
-  phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
-
-  aParallel1dDg:write(string.format("a_%d.h5", frameNum), tCurr)
-  --aParallel1dDgDup:write(string.format("aDup_%d.h5", frameNum), tCurr)
+  --aParallel1dDg:write(string.format("a_%d.h5", frameNum), tCurr)
 
   fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum) )
 
@@ -893,7 +886,6 @@ calcHamiltonianIon(0.0, 0.0, phi1d, aParallel1d, aSquared1d, hamilKeIon, hamilIo
 -- compute initial diagnostics
 calcDiagnostics(0.0, 0.0)
 -- write out initial conditions
-aParallel1dDgDup = aParallel1dDg:duplicate()
 writeFields(0, 0.0)
 -- make a duplicate in case we need it
 distfDupElc = distfElc:duplicate()

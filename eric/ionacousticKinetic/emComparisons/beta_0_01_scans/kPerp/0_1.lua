@@ -13,11 +13,12 @@ cfl = 0.1
 knumber = 0.5
 
 -- initial number density in each cell (1/m^3)
+-- Corresponds to beta_e of 0.01
 initNumDens = 9.947e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
 
-kPerpTimesRho = 0.4
+kPerpTimesRho = 0.1
 -- electron temperature (eV)
 elcTemp = 250
 -- ion temperature (eV)
@@ -51,7 +52,7 @@ kPerp = kPerpTimesRho/rho_i
 -- domain extents
 XL, XU = -Lucee.Pi/knumber, Lucee.Pi/knumber
 -- number of cells
-NX, NP = 16, 16
+NX, NP = 16, 32
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
 PL_ELC, PU_ELC = -6.0*elcMass*vtElc, 6.0*elcMass*vtElc
@@ -61,7 +62,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 3e-5
+tEnd = 2e-5
 nFrames = 1
 
 -- A generic function to run an updater.
@@ -146,8 +147,6 @@ initDistfElc = Updater.EvalOnNodes2D {
       local elcThermal = math.sqrt(elcTemp*Lucee.ElementaryCharge/elcMass)
       local alpha = 1e-6 -- perturbation
 		  local k = knumber
-		  --local nHat = (initNumDens*(1+alpha*math.cos(k*x)) + kPerpTimesRho*kPerpTimesRho*initNumDens)/
-		  --  (1+kPerpTimesRho*kPerpTimesRho)
 		  local nHat = initNumDens*(1+alpha*math.cos(k*x))
 		  return maxwellian(nHat, elcMass, elcThermal, y)
 	   end
@@ -163,8 +162,6 @@ initDistfIon = Updater.EvalOnNodes2D {
    -- function to use for initialization
    evaluate = function(x,y,z,t)
 		 local ionThermal = math.sqrt(ionTemp*Lucee.ElementaryCharge/ionMass)
-		 local alpha = 0.01 -- perturbation
-		 local k = knumber
 		 return maxwellian(initNumDens, ionMass, ionThermal, y)
 	  end
 }
@@ -461,7 +458,7 @@ electromagneticACalc = Updater.ElectromagneticAUpdater {
   elcMass = elcMass,
   ionMass = ionMass,
   elcCharge = elcCharge,
-  ionCharge = ionCharge,
+  ionCharge = 0,
   mu0 = mu0,
 }
 
@@ -703,8 +700,8 @@ totalIonEnergyCalc = Updater.KineticEnergyUpdater {
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi1d}, {fieldEnergy})
-  runUpdater(totalElcEnergyCalc, curr, dt, {distfElc, hamilElc}, {totalElcEnergy})
-  runUpdater(totalIonEnergyCalc, curr, dt, {distfIon, hamilIon}, {totalIonEnergy})
+  --runUpdater(totalElcEnergyCalc, curr, dt, {distfElc, hamilElc}, {totalElcEnergy})
+  --runUpdater(totalIonEnergyCalc, curr, dt, {distfIon, hamilIon}, {totalIonEnergy})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme

@@ -31,23 +31,23 @@ Te0 = 250
 eV = 1.602176565e-19
 nSim = 9.947e19
 beta_e = 2*mu0*Te0*eV*nSim/B**2
+vA = B/sqrt(mu0*m_i*nSim)
 
 tol = 1e-8
 for index, kPerpRho in enumerate(kPerpRhoList):
   # Initial guess for z0 = omega/(k*sqrt(2)*vTe) using approximate expression for wave frequency
-  vA = B/sqrt(mu0*m_i*nSim)
   z0 = vA/(sqrt(2*Te0*eV/m_e)*sqrt(1+2/beta_e*m_e/m_i*kPerpRho**2))
 
   z0 = optimize.newton(eps,z0,derivEps,(beta_e,),tol,10000)
   exactFreqList[index] = fabs(z0.real*sqrt(2*Te0*eV/m_e)/vA);
 
 kPerpSimList = [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-tSimList = [4.020e-7, 1.656e-6, 2.336e-6, 2.659e-6, 2.685e-6, 2.639e-6, 2.563e-6, 2.474e-6, 2.382e-6, 2.292e-6,
+tSimList = [2.8034e-6, 1.656e-6, 2.863e-6, 2.659e-6, 2.685e-6, 2.639e-6, 2.563e-6, 2.474e-6, 2.382e-6, 2.292e-6,
     2.197e-6, 2.108e-6]
 omegaSimList = zeros(len(kPerpSimList))
 
 for index, kPerpRho in enumerate(kPerpSimList):
-  omegaSimList[index] = 0.5*(2*pi/tSimList[index])/(kPar*B/sqrt(mu0*nSim*m_i))
+  omegaSimList[index] = 0.5*(2*pi/tSimList[index])/(kPar*vA)
 
 plt.plot(kPerpRhoList, exactFreqList,'r-',label='Exact')
 plt.plot(kPerpSimList, omegaSimList,'b-o',label='Sim')

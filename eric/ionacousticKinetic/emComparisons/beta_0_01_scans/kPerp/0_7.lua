@@ -18,7 +18,7 @@ initNumDens = 9.947e19
 -- temperature ratio (T_i/T_e)
 Tratio = 0.25
 
-kPerpTimesRho = 0.6
+kPerpTimesRho = 0.7
 -- electron temperature (eV)
 elcTemp = 250
 -- ion temperature (eV)
@@ -62,7 +62,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 3e-5
+tEnd = 2e-5
 nFrames = 1
 
 -- A generic function to run an updater.
@@ -458,7 +458,7 @@ electromagneticACalc = Updater.ElectromagneticAUpdater {
   elcMass = elcMass,
   ionMass = ionMass,
   elcCharge = elcCharge,
-  ionCharge = ionCharge,
+  ionCharge = 0,
   mu0 = mu0,
 }
 
@@ -700,8 +700,8 @@ totalIonEnergyCalc = Updater.KineticEnergyUpdater {
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi1d}, {fieldEnergy})
-  runUpdater(totalElcEnergyCalc, curr, dt, {distfElc, hamilElc}, {totalElcEnergy})
-  runUpdater(totalIonEnergyCalc, curr, dt, {distfIon, hamilIon}, {totalIonEnergy})
+  --runUpdater(totalElcEnergyCalc, curr, dt, {distfElc, hamilElc}, {totalElcEnergy})
+  --runUpdater(totalIonEnergyCalc, curr, dt, {distfIon, hamilIon}, {totalIonEnergy})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
