@@ -56,7 +56,7 @@ Sn   = A*nPed*cPed/lSource
 -- domain extents
 XL, XU = -lParallel, lParallel
 -- number of cells
-NX, NV = 32, 32
+NX, NV = 8, 32
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(tPed*eV/electronMass)
 VL_ELC, VU_ELC = -6.0*vtElc, 6.0*vtElc
@@ -740,10 +740,20 @@ mhdHamiltonian2d = DataStruct.Field2D {
    -- ghost cells to write
    writeGhost = {0, 1} -- write extra layer on right to get nodes
 }
+mhdHamiltonian2dDg = DataStruct.Field2D {
+   onGrid = gridIon,
+   numComponents = basisIon:numNodes(),
+   ghost = {1, 1},
+}
+-- stores mhd hamiltonian contribution to total energy
+mhdHamiltonianEnergy = DataStruct.DynVector { numComponents = 1, }
 
 -- compute hamiltonian for ions
 function calcHamiltonianIon(curr, dt, phiIn, hamilOut)
    hamilOut:clear(0.0)
+   mhdHamiltonian1d:clear(0.0)
+   mhdHamiltonian2d:clear(0.0)
+
    copyPhi(copyTo2DIon, curr, dt, phiIn, hamilOut)
    hamilOut:scale(ionCharge/ionMass)
    hamilOut:accumulate(1.0, hamilKeIon)
@@ -753,7 +763,8 @@ function calcHamiltonianIon(curr, dt, phiIn, hamilOut)
    runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
    runUpdater(phiToContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
    runUpdater(copyTo2DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian2d})
-   hamilOut:accumulate(kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/(Te0*ionMass), mhdHamiltonian2d)
+   mhdHamiltonian2d:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/(Te0*ionMass))
+   hamilOut:accumulate(1.0, mhdHamiltonian2d)
 end
 
 -- A HACK
@@ -849,6 +860,9 @@ function calcDiagnostics(curr, dt)
    -- compute source energy using discrete hamiltonian
    runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
    runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
+   -- compute MHD hamiltonian contribution to total energy
+   runUpdater(copyCToDIon2D, curr, dt, {mhdHamiltonian2d}, {mhdHamiltonian2dDg})
+   runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, mhdHamiltonian2dDg}, {mhdHamiltonianEnergy})
    
    runUpdater(totalEnergyCalc, curr, dt, {heatFluxAtEdge, hamilElcEnergy, 
     hamilIonEnergy, hamilSrcElcEnergy, hamilSrcIonEnergy}, {totalEnergy})
@@ -988,14 +1002,14 @@ end
 
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
-   distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
-   distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
+   --distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
+   --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
    cutoffVelocities:write( string.format("cutoffVelocities_%d.h5", frameNum) ,tCurr)
    totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
-   copyPotential(0.0, 0.0, phi1d, phi1dDg)
-   phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
-   mhdHamiltonian1dDg:write(string.format("mhdHamiltonian_%d.h5", frameNum), tCurr)
+   --copyPotential(0.0, 0.0, phi1d, phi1dDg)
+   --phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   mhdHamiltonianEnergy:write(string.format("mhdHamiltonian_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
