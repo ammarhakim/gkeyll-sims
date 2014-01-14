@@ -861,6 +861,7 @@ function calcDiagnostics(curr, dt)
    runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
    runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
    -- compute MHD hamiltonian contribution to total energy
+   mhdHamiltonian2d:scale(ionMass)
    runUpdater(copyCToDIon2D, curr, dt, {mhdHamiltonian2d}, {mhdHamiltonian2dDg})
    runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, mhdHamiltonian2dDg}, {mhdHamiltonianEnergy})
    

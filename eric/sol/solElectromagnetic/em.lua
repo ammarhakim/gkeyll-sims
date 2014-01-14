@@ -60,7 +60,7 @@ Sn   = A*nPed*cPed/lSource
 -- domain extents
 XL, XU = -lParallel, lParallel
 -- number of cells
-NX, NP = 32, 32
+NX, NP = 8, 32
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(tPed*eV/elcMass)
 PL_ELC, PU_ELC = -6.0*elcMass*vtElc, 6.0*elcMass*vtElc
@@ -70,7 +70,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 300.0e-6
+tEnd = 7.5e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -655,13 +655,8 @@ copyTo2DElcDg = Updater.NodalCopyFaceToInteriorUpdater {
 
 -- function to copy 1D field to 2D field
 function copyCont1DTo2D(copier, curr, dt, phi1, phi2)
+   phi2:clear(0.0)
    return runUpdater(copier, curr, dt, {phi1}, {phi2})
-end
-
--- compute phi from number density
-function calcPhiFromChargeDensity(curr, dt, distElcIn, distIonIn, cutoffVIn, phiOut)
-   calcMoments(curr, dt, distElcIn, distIonIn)
-   runUpdater(electrostaticPhiCalc, curr, dt, {numDensityElc, numDensityIon, cutoffVIn}, {phiOut})
 end
 
 -- Dynvectors to store 0-3rd moments at left and right edges
@@ -1032,8 +1027,14 @@ function rk3(tCurr, myDt)
 
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, aParallel1dDg, cutoffVelocities1)
    
-   calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities1, phi1dDg)
+   calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
+   runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon, cutoffVelocities1}, {phi1dDg})
    calcContinuous1dField(tCurr, myDt, phi1dDg, phi1d)
+   -- Compute A-parallel
+   runUpdater(electromagneticACalc, tCurr, myDt, {mom0Elc, mom0Ion, mom1Elc, mom1Ion}, {aParallel1dDg})
+   calcContinuous1dField(tCurr, myDt, aParallel1dDg, aParallel1d)
+   -- Copy continuous field back to discontinuous field
+   calcDiscontinuousField(tCurr, myDt, aParallel1d, aParallel1dDg)
    -- Compute projection of A(x)^2
    runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg}, {aSquared1dDg})
    calcContinuous1dField(tCurr, myDt, aSquared1dDg, aSquared1d)
@@ -1064,8 +1065,14 @@ function rk3(tCurr, myDt)
 
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, aParallel1dDg, cutoffVelocities2)
    
-   calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities2, phi1dDg)
+   calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
+   runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon, cutoffVelocities2}, {phi1dDg})
    calcContinuous1dField(tCurr, myDt, phi1dDg, phi1d)
+   -- Compute A-parallel
+   runUpdater(electromagneticACalc, tCurr, myDt, {mom0Elc, mom0Ion, mom1Elc, mom1Ion}, {aParallel1dDg})
+   calcContinuous1dField(tCurr, myDt, aParallel1dDg, aParallel1d)
+   -- Copy continuous field back to discontinuous field
+   calcDiscontinuousField(tCurr, myDt, aParallel1d, aParallel1dDg)
    -- Compute projection of A(x)^2
    runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg}, {aSquared1dDg})
    calcContinuous1dField(tCurr, myDt, aSquared1dDg, aSquared1d)
@@ -1099,8 +1106,14 @@ function rk3(tCurr, myDt)
    distfElc:copy(distf1Elc)
    distfIon:copy(distf1Ion)
 
-   calcPhiFromChargeDensity(tCurr, myDt, distfElc, distfIon, cutoffVelocities, phi1dDg)
+   calcMoments(tCurr, myDt, distfElc, distfIon)
+   runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon, cutoffVelocities}, {phi1dDg})
    calcContinuous1dField(tCurr, myDt, phi1dDg, phi1d)
+   -- Compute A-parallel
+   runUpdater(electromagneticACalc, tCurr, myDt, {mom0Elc, mom0Ion, mom1Elc, mom1Ion}, {aParallel1dDg})
+   calcContinuous1dField(tCurr, myDt, aParallel1dDg, aParallel1d)
+   -- Copy continuous field back to discontinuous field
+   calcDiscontinuousField(tCurr, myDt, aParallel1d, aParallel1dDg)
    -- Compute projection of A(x)^2
    runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg}, {aSquared1dDg})
    calcContinuous1dField(tCurr, myDt, aSquared1dDg, aSquared1d)
@@ -1166,10 +1179,10 @@ end
 
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
-   numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
-   numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
+   --numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
+   --numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
    distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
-   distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
+   --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
    --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum) )
@@ -1178,9 +1191,9 @@ function writeFields(frameNum, tCurr)
    --momentumElc:write( string.format("mom1Elc_%d.h5", frameNum), tCurr)
    --mom3Ion:write( string.format("mom3Ion_%d.h5", frameNum), tCurr)
    --mom3Elc:write( string.format("mom3Elc_%d.h5", frameNum), tCurr)
-   calcDiscontinuousField(0.0, 0.0, phi1d, phi1dDg)
-   phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
-   aParallel1dDg:write(string.format("a_%d.h5", frameNum), tCurr)
+   --calcDiscontinuousField(0.0, 0.0, phi1d, phi1dDg)
+   --phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   --aParallel1dDg:write(string.format("a_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
@@ -1194,7 +1207,8 @@ aSquared1d:clear(0.0)
 applyBc(0.0, 0.0, distfElc, distfIon, aParallel1dDg, cutoffVelocities)
 
 -- calculate initial phi
-calcPhiFromChargeDensity(0.0, 0.0, distfElc, distfIon, cutoffVelocities, phi1dDg)
+calcMoments(0.0, 0.0, distElc, distIon)
+runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon, cutoffVelocities}, {phi1dDg})
 calcContinuous1dField(0.0, 0.0, phi1dDg, phi1d)
 -- calculate initial Hamiltonian
 calcHamiltonianElc(0.0, 0.0, phi1d, aParallel1d, aSquared1d, hamilKeElc, hamilElc)
