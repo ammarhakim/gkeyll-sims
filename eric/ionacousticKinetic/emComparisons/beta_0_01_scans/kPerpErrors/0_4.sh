@@ -2,7 +2,7 @@
 
 #PBS -N gke-kinetic-test
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
-#PBS -m aeb 
+#PBS -m ae
 #PBS -M eshi@pppl.gov 
 #PBS -l nodes=1:ppn=1 
 #PBS -l mem=4gb 
