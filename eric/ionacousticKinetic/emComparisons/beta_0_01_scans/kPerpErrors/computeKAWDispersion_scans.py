@@ -3,7 +3,14 @@ from scipy import special
 from scipy import optimize
 import matplotlib.pyplot as plt
 import math
+from matplotlib import rcParams
 from matplotlib import rc
+
+rcParams['legend.fontsize'] = 16
+font = {'family' : 'sans-serif',
+        'sans-serif' : ['Arial'],
+        'size'   : 18}
+rc('font', **font)
 
 def plasmaDisp(z):
     return 1j*sqrt(pi)*exp(-z**2)*(1+special.erf(1j*z))
@@ -42,23 +49,35 @@ for index, kPerpRho in enumerate(kPerpRhoList):
   exactFreqList[index] = fabs(z0.real*sqrt(2*Te0*eV/m_e)/vA);
 
 kPerpSimList = [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-tSimList = [2.980e-7, 1.327e-6, 2.061e-6, 2.549e-6, 2.652e-6, 2.607e-6, 2.544e-6, 2.479e-6, 2.376e-6, 2.280e-6,
+tSimList = [2.802e-6, 2.867e-6, 2.861e-6, 2.829e-6, 2.759e-6, 2.681e-6, 2.589e-6, 2.492e-6, 2.392e-6, 2.294e-6,
+    2.199e-6, 2.106e-6]
+tSimListErrors = [2.980e-7, 1.327e-6, 2.061e-6, 2.549e-6, 2.652e-6, 2.607e-6, 2.544e-6, 2.479e-6, 2.376e-6, 2.280e-6,
     2.188e-6, 2.098e-6]
 omegaSimList = zeros(len(kPerpSimList))
+omegaSimListErrors = zeros(len(kPerpSimList))
 
 for index, kPerpRho in enumerate(kPerpSimList):
   omegaSimList[index] = 0.5*(2*pi/tSimList[index])/(kPar*vA)
+  omegaSimListErrors[index] = 0.5*(2*pi/tSimListErrors[index])/(kPar*vA)
 
-plt.plot(kPerpRhoList, exactFreqList,'r-',label='Exact')
-plt.plot(kPerpSimList, omegaSimList,'b-o',label='Sim')
+# Make a plot
+fig = plt.figure(1, figsize=(12,8))
+
+plt.semilogx(kPerpRhoList, exactFreqList,'r-',label='Exact')
+plt.semilogx(kPerpSimList, omegaSimList,'b-o',label='Sim')
+plt.semilogx(kPerpSimList, omegaSimListErrors,'g-o',label='0.1% Error in Density')
 
 #plt.xlim(kPerpRhoList[0],kPerpRhoList[-1])
-plt.ylim(0,8)
+plt.ylim(0,10)
 plt.xlabel(r'$k_\perp \rho_s$')
 plt.ylabel(r'$\omega/(k_\parallel v_A)$')
 plt.legend(loc='upper right')
+ax = fig.gca()
+ax.set_xscale('log', basex=10, subsx=arange(2,9,1))
+ax.xaxis.grid(True, which='both')
 #plt.autoscale(enable=True,axis='y',tight=True)
 plt.title(r'Scan at 16X32V, $\beta_e$ = 0.01')
-plt.savefig('kaw_kPerpScan.pdf')
+plt.savefig('kaw_kPerpScan.pdf',bbox_inches='tight', \
+                        pad_inches=0.1)
 plt.show()
 #plt.close()
