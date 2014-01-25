@@ -41,9 +41,9 @@ for index, kPerpRho in enumerate(kPerpRhoList):
   z0 = optimize.newton(eps,z0,derivEps,(beta_e,),tol,10000)
   exactFreqList[index] = fabs(z0.real*sqrt(2*Te0*eV/m_e)/vA);
 
-kPerpSimList = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-tSimList = [2.8034e-6, 2.863e-6, 2.659e-6, 2.685e-6, 2.639e-6, 2.563e-6, 2.474e-6, 2.382e-6, 2.292e-6,
-    2.197e-6, 2.108e-6]
+kPerpSimList = [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+tSimList = [2.802e-6, 2.867e-6, 2.861e-6, 2.829e-6, 2.759e-6, 2.681e-6, 2.589e-6, 2.492e-6, 2.392e-6, 2.294e-6,
+    2.199e-6, 2.106e-6]
 omegaSimList = zeros(len(kPerpSimList))
 
 for index, kPerpRho in enumerate(kPerpSimList):
