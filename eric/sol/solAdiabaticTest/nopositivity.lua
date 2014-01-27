@@ -1,7 +1,7 @@
 -- Test to see effect of adiabatic elc without positivity
 
 -- polynomial order
-polyOrder = 1
+polyOrder = 2
 
 -- cfl number to use
 cfl = 0.1
@@ -43,14 +43,14 @@ Sn   = A*nPed*cPed/lSource
 XL, XU = -lParallel, lParallel
 VL, VU = -6.0*vtPed, 6.0*vtPed
 -- number of cells
-NX, NV = 32, 32
+NX, NV = 8, 32
 
 -- L-B coefficient
 lbAlpha = 0
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 500e-6
+tEnd = 350e-6
 nFrames = 1
 
 -- Determine number of global nodes per cell for use in creating CG
@@ -167,6 +167,12 @@ hamilKE = DataStruct.Field2D {
    -- ghost cells to write
    writeGhost = {0, 1} -- write extra layer on right to get nodes
 }
+-- DG versions of the hamiltonian
+hamilKeDg = DataStruct.Field2D {
+   onGrid = grid,
+   numComponents = basis:numNodes(),
+   ghost = {1, 1},
+}
 
 -- updater to initialize hamiltonian
 initHamilKE = Updater.EvalOnNodes2D {
@@ -184,6 +190,13 @@ initHamilKE = Updater.EvalOnNodes2D {
 initHamilKE:setOut( {hamilKE} )
 -- initialize potential
 initHamilKE:advance(0.0) -- time is irrelevant
+
+-- create updater to copy a continuous field to a discontinuous field
+copyCToD2D = Updater.CopyContToDisCont2D {
+   onGrid = grid,
+   basis = basis,
+}
+runUpdater(copyCToD2D, 0.0, 0.0, {hamilKE}, {hamilKeDg})
 
 -- updater to initialize distribution function
 initDistf = Updater.ProjectOnNodalBasis2D {
@@ -507,8 +520,8 @@ totalPtclEnergyCalc:setIn( {ptclEnergy} )
 -- set output dynvector
 totalPtclEnergyCalc:setOut( {totalPtclEnergy} )
 
--- Dynvector to store 1st and 3rd moments at left and right edges
-momentsAtEdges = DataStruct.DynVector { numComponents = 4, }
+-- Dynvector to store 0-3rd moments at left and right edges
+momentsAtEdges = DataStruct.DynVector { numComponents = 8, }
 
 momentsAtEdgesCalc = Updater.MomentsAtEdgesUpdater {
   onGrid = grid,
@@ -544,47 +557,13 @@ vFromMomentsCalc = Updater.VelocitiesFromMomentsUpdater {
   onGrid = grid_1d,
   basis = basis_1d,
 }
-vFromMomentsCalc:setIn( {numDensity, firstMoment, ptclEnergy} )
-vFromMomentsCalc:setOut( {driftU, vThermSq} )
-
--- calculate number density
-function calcNumDensity(curr, dt, distfIn, numDensOut)
-   numDensityCalc:setCurrTime(curr)
-   numDensityCalc:setIn( {distfIn} )
-   numDensityCalc:setOut( {numDensOut} )
-   numDensityCalc:advance(curr+dt)
-end
-
--- calculate first velocity moment (moment 1)
-function calcFirstMoment(curr, dt, distfIn, firstMomentOut)
-   firstMomentCalc:setCurrTime(curr)
-   firstMomentCalc:setIn( {distfIn} )
-   firstMomentCalc:setOut( {firstMomentOut} )
-   firstMomentCalc:advance(curr+dt)
-end
-
--- calculate ptcl energy
-function calcPtclEnergy(curr, dt, distfIn, energyOut)
-   ptclEnergyCalc:setCurrTime(curr)
-   ptclEnergyCalc:setIn( {distfIn} )
-   ptclEnergyCalc:setOut( {energyOut} )
-   ptclEnergyCalc:advance(curr+dt)
-end
-
--- calculate third velocity moment (moment 3)
-function calcThirdMoment(curr, dt, distfIn, thirdMomentOut)
-   thirdMomentCalc:setCurrTime(curr)
-   thirdMomentCalc:setIn( {distfIn} )
-   thirdMomentCalc:setOut( {thirdMomentOut} )
-   thirdMomentCalc:advance(curr+dt)
-end
 
 -- compute moments from distribution function
 function calcMoments(curr, dt, distfIn)
-   calcNumDensity(curr, dt, distfIn, numDensity)
-   calcFirstMoment(curr, dt, distfIn, firstMoment)
-   calcPtclEnergy(curr, dt, distfIn, ptclEnergy)
-   calcThirdMoment(curr, dt, distfIn, thirdMoment)
+   runUpdater(numDensityCalc, curr, dt, {distfIn}, {numDensity})
+   runUpdater(firstMomentCalc, curr, dt, {distfIn}, {firstMoment})
+   runUpdater(ptclEnergyCalc, curr, dt, {distfIn}, {ptclEnergy})
+   runUpdater(thirdMomentCalc, curr, dt, {distfIn}, {thirdMoment})
 end
 
 -- updater to copy 1D field to 2D field
@@ -719,39 +698,22 @@ function solveDiff(curr, dt, distfIn, vThermSqIn, numDensityIn, distfOut)
    return lbDiffSlvr:advance(curr+dt)
 end
 
--- compute phi from number density and thermal velocity
-function calcPhiFromNumDensity(curr, dt, numDensIn, vtSqIn, mom1In, phiOut)
-   phiOut:clear(0.0)
-   phiFromNumDensityCalc:setCurrTime(curr)
-   phiFromNumDensityCalc:setIn( {numDensIn, mom1In, vtSqIn} )
-   phiFromNumDensityCalc:setOut( {phiOut} )
-   return phiFromNumDensityCalc:advance(curr+dt)
-end
-
--- compute continuous phi from discontinuous phi
-function calcContinuousPhi(curr, dt, phiIn, phiOut)
-   phiOut:clear(0.0)
-   phiToContCalc:setCurrTime(curr)
-   phiToContCalc:setIn( {phiIn} )
-   phiToContCalc:setOut( {phiOut} )
-   return phiToContCalc:advance(curr+dt)
-end
-
-function calcVelocitiesFromMoments(curr, dt)
-  vFromMomentsCalc:setCurrTime(curr)
-  vFromMomentsCalc:advance(curr+dt)
-end
-
 -- compute hamiltonian
 function calcHamiltonian(curr, dt, distIn, hamilOut)
    calcMoments(curr, dt, distIn)
-   calcVelocitiesFromMoments(curr, dt)
-   calcPhiFromNumDensity(curr, dt, numDensity, vThermSq, firstMoment, phi1dDiscont)
-   calcContinuousPhi(curr, dt, phi1dDiscont, phi1d)
+   runUpdater(vFromMomentsCalc, curr, dt, {numDensity, firstMoment, ptclEnergy}, {driftU, vThermSq})
+
+   phi1dDiscont:clear(0.0)
+   runUpdater(phiFromNumDensityCalc, curr, dt, {numDensity, firstMoment, vThermSq}, {phi1dDiscont})
+
+   phi1d:clear(0.0)
+   runUpdater(phiToContCalc, curr, dt, {phi1dDiscont}, {phi1d})
 
    hamilOut:clear(0.0)
-   copyPhi(curr, dt, phi1d, hamilOut) -- potential energy contribution
+   -- Accumulate potential energy contribution to hamiltonian
+   runUpdater(copyTo2D, curr, dt, {phi1d}, {hamilOut})
    hamilOut:scale(ionCharge/ionMass)
+   -- Accumulate kinetic energy contribution to hamiltonian
    hamilOut:accumulate(1.0, hamilKE)
 end
 
@@ -766,7 +728,8 @@ function calcDiagnostics(curr, dt)
    totalPtclEnergyCalc:setCurrTime(curr)
    totalPtclEnergyCalc:advance(curr+dt)
 
-   runUpdater(momentsAtEdgesCalc, curr, dt, {distf}, {momentsAtEdges})
+   -- compute moments at edges
+   runUpdater(momentsAtEdgesCalc, curr, dt, {distf, hamilKeDg}, {momentsAtEdges})
 
    runUpdater(heatFluxAtEdgeCalc, curr, dt, {vThermSq, phi1dDiscont, momentsAtEdges}, {heatFluxAtEdge})
 
@@ -788,16 +751,14 @@ function rk3(tCurr, myDt)
      if tCurr + myDt > tELM then
        postELM = true
        particleSourceUpdater:advance(tCurr + myDt)
-
-       -- Calculate first moment of particle source at t = 0
-        calcNumDensity(0.0, 0.0, particleSource, mom0Source)
-        -- Calculate second moment of particle source at t = 0
-        calcPtclEnergy(0.0, 0.0, particleSource, mom2Source)
+       -- Recalculate moments of particle source
+       runUpdater(numDensityCalc, tCurr, myDt, {particleSource}, {mom0Source})
+       runUpdater(ptclEnergyCalc, tCurr, myDt, {particleSource}, {mom2Source})
      end
    end
 
    -- RK stage 1
-   pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf, hamil, distf1)
+   pbStatus, pbDtSuggested = runUpdater(pbSlvr, tCurr, myDt, {distf, hamil}, {distf1})
    diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf, vThermSq, numDensity, diffDistf1)
    dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf, driftU, vThermSq, numDensity, dragDistf1)
    
@@ -813,7 +774,7 @@ function rk3(tCurr, myDt)
    calcHamiltonian(tCurr, myDt, distf1, hamil)
 
    -- RK stage 2
-   pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf1, hamil, distfNew)
+   pbStatus, pbDtSuggested = runUpdater(pbSlvr, tCurr, myDt, {distf1, hamil}, {distfNew})
    diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, numDensity, diffDistf1)
    dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, vThermSq, numDensity, dragDistf1)
 
@@ -831,7 +792,7 @@ function rk3(tCurr, myDt)
    calcHamiltonian(tCurr, myDt, distf1, hamil)
 
    -- RK stage 3
-   pbStatus, pbDtSuggested = poissonBracket(tCurr, myDt, distf1, hamil, distfNew)
+   pbStatus, pbDtSuggested = runUpdater(pbSlvr, tCurr, myDt, {distf1, hamil}, {distfNew})
    diffStatus, diffDtSuggested = solveDiff(tCurr, myDt, distf1, vThermSq, numDensity, diffDistf1)
    dragStatus, dragDtSuggested = solveDrag(tCurr, myDt, distf1, driftU, vThermSq, numDensity, dragDistf1)
 
@@ -907,9 +868,9 @@ function writeFields(frameNum, tCurr)
 end
 
 -- Calculate first moment of particle source at t = 0
-calcNumDensity(0.0, 0.0, particleSource, mom0Source)
+runUpdater(numDensityCalc, 0.0, 0.0, {particleSource}, {mom0Source})
 -- Calculate second moment of particle source at t = 0
-calcPtclEnergy(0.0, 0.0, particleSource, mom2Source)
+runUpdater(ptclEnergyCalc, 0.0, 0.0, {particleSource}, {mom2Source})
 
 applyBc(0.0, 0.0, distf)
 -- calculate initial Hamiltonian
