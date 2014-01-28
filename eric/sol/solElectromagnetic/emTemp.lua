@@ -22,7 +22,7 @@ elcCharge = -Lucee.ElementaryCharge
 
 -- physical input parameters
 
-kPerpTimesRho = 0.2
+kPerpTimesRho = 0.1
 -- pedestal density (1/m^3)
 nPed = 5e19
 -- pedestal (source) temperature (eV)
