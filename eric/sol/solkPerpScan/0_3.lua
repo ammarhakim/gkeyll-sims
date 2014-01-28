@@ -1,6 +1,5 @@
 -- Input file for SOL problem with kinetic ions and electrons
--- This test has positivty preservation turned off
--- PolyOrder 2 and kPerp = 0.2
+-- PolyOrder 2 and kPerp = 0.3
 
 -- polynomial order
 polyOrder = 2
@@ -797,26 +796,28 @@ function calcDiagnostics(curr, dt)
    runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc, momentsAtEdgesIon}, {heatFluxAtEdge})
 
    -- Copy potential to 2d grids
+   -- I think the follow five lines are not needed?
    --runUpdater(copyTo2DElc, curr, dt, {phi1d}, {phi2dElc})
    --runUpdater(copyTo2DIon, curr, dt, {phi1d}, {phi2dIon})
    -- Accumulate to hamiltonians to get 0.5*q/m*phi
    --hamilElc:accumulate(0.5*Lucee.ElementaryCharge/electronMass, phi2dElc)
    --hamilIon:accumulate(-0.5*ionCharge/ionMass, phi2dIon)
-   -- copy hamiltonian to DG field
-   runUpdater(copyCToDElc2D, curr, dt, {hamilElc}, {hamilElcDg})
-   runUpdater(copyCToDIon2D, curr, dt, {hamilIon}, {hamilIonDg})
-   -- accumulate perpendicular energy terms
-   hamilElcDg:accumulate(1.0, hamilPerpElcDg)
-   hamilIonDg:accumulate(1.0, hamilPerpIonDg)
-   -- compute energy using discrete hamiltonian
-   runUpdater(hamilElcEnergyCalc, curr, dt, {distfElc, hamilElcDg}, {hamilElcEnergy})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, hamilIonDg}, {hamilIonEnergy})
-   -- compute source energy using discrete hamiltonian
-   runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
    
-   runUpdater(totalEnergyCalc, curr, dt, {heatFluxAtEdge, hamilElcEnergy, 
-    hamilIonEnergy, hamilSrcElcEnergy, hamilSrcIonEnergy}, {totalEnergy})
+   -- copy hamiltonian to DG field
+   --runUpdater(copyCToDElc2D, curr, dt, {hamilElc}, {hamilElcDg})
+   --runUpdater(copyCToDIon2D, curr, dt, {hamilIon}, {hamilIonDg})
+   -- accumulate perpendicular energy terms
+   --hamilElcDg:accumulate(1.0, hamilPerpElcDg)
+   --hamilIonDg:accumulate(1.0, hamilPerpIonDg)
+   -- compute energy using discrete hamiltonian
+   --runUpdater(hamilElcEnergyCalc, curr, dt, {distfElc, hamilElcDg}, {hamilElcEnergy})
+   --runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, hamilIonDg}, {hamilIonEnergy})
+   -- compute source energy using discrete hamiltonian
+   --runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
+   --runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
+   
+   --runUpdater(totalEnergyCalc, curr, dt, {heatFluxAtEdge, hamilElcEnergy, 
+   -- hamilIonEnergy, hamilSrcElcEnergy, hamilSrcIonEnergy}, {totalEnergy})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -953,13 +954,13 @@ end
 
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
-   distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
-   distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
+   --distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
+   --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
    cutoffVelocities:write( string.format("cutoffVelocities_%d.h5", frameNum) ,tCurr)
-   totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
-   copyPotential(0.0, 0.0, phi1d, phi1dDg)
-   phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   --totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
+   --copyPotential(0.0, 0.0, phi1d, phi1dDg)
+   --phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
