@@ -56,7 +56,7 @@ Sn   = A*nPed*cPed/lSource
 -- domain extents
 XL, XU = -lParallel, lParallel
 -- number of cells
-NX, NV = 32, 32
+NX, NV = 8, 32
 -- compute max thermal speed to set velocity space extents
 vtElc = math.sqrt(tPed*eV/electronMass)
 VL_ELC, VU_ELC = -6.0*vtElc, 6.0*vtElc
