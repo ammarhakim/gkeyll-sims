@@ -961,6 +961,8 @@ function writeFields(frameNum, tCurr)
    --totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
    --copyPotential(0.0, 0.0, phi1d, phi1dDg)
    --phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   momentumElc:write(string.format("mom1Elc_%d.h5", frameNum), tCurr)
+   momentumIon:write(string.format("mom1Ion_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
