@@ -9,13 +9,15 @@ cfl = 0.01
 
 -- physical constants
 -- eletron mass (kg)
-electronMass = Lucee.ElectronMass
+elcMass = Lucee.ElectronMass
 -- electron volt to joules
 eV = Lucee.ElementaryCharge
 -- Deuterium ion mass (kg)
 ionMass = 2.014*Lucee.ProtonMass
 -- signed ion charge
 ionCharge = Lucee.ElementaryCharge
+-- signed electron charge
+elcCharge = -Lucee.ElementaryCharge
 
 -- physical input parameters
 
@@ -57,7 +59,7 @@ XL, XU = -lParallel, lParallel
 -- number of cells
 NX, NV = 8, 32
 -- compute max thermal speed to set velocity space extents
-vtElc = math.sqrt(tPed*eV/electronMass)
+vtElc = math.sqrt(tPed*eV/elcMass)
 VL_ELC, VU_ELC = -6.0*vtElc, 6.0*vtElc
 
 vtIon = math.sqrt(tPed*eV/ionMass)
@@ -176,7 +178,7 @@ initDistfElc = Updater.ProjectOnNodalBasis2D {
      -- Average background density
      local n0 = (0.7 + 0.3/2 + 0.5*lSource/(lParallel*math.pi))*1e19
      local nHat = (backgroundDens + kPerpTimesRho^2*n0)/(1 + kPerpTimesRho^2)
-     local vTe = math.sqrt(backgroundTemp*eV/electronMass)
+     local vTe = math.sqrt(backgroundTemp*eV/elcMass)
 
      return maxwellian(nHat,0.0,vTe,y)
 	 end
@@ -350,7 +352,7 @@ initHamilPerpElc = Updater.EvalOnNodes2D {
    basis = basisElc,
    shareCommonNodes = false,
    evaluate = function (x,y,z,t)
-      return tPed*eV/electronMass
+      return tPed*eV/elcMass
    end
 }
 runUpdater(initHamilPerpElc, 0.0, 0.0, {}, {hamilPerpElcDg})
@@ -384,9 +386,9 @@ particleSourceUpdaterElc = Updater.ProjectOnNodalBasis2D {
    evaluate = function(x,y,z,t)
     if math.abs(x) < lSource/2 then
       if t < tELM then
-        return maxwellian(Sn*math.cos(math.pi*x/lSource), 0.0, math.sqrt(tPed*eV/electronMass), y)
+        return maxwellian(Sn*math.cos(math.pi*x/lSource), 0.0, math.sqrt(tPed*eV/elcMass), y)
       else
-        return maxwellian(Sn/9*math.cos(math.pi*x/lSource), 0.0, math.sqrt(210*eV/electronMass), y)
+        return maxwellian(Sn/9*math.cos(math.pi*x/lSource), 0.0, math.sqrt(210*eV/elcMass), y)
       end
     else
       return 0
@@ -584,6 +586,15 @@ phi1d = DataStruct.Field1D {
    writeGhost = {0, 1},
 }
 
+-- continuous potential before it has the right boundary value
+phi1dBeforeBc = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numExclusiveNodes(),
+   ghost = {1, 1},
+   -- write ghosts
+   writeGhost = {0, 1},
+}
+
 phi2dElc = DataStruct.Field2D {
    onGrid = gridElc,
    numComponents = basisElc:numExclusiveNodes(),
@@ -615,6 +626,13 @@ electrostaticPhiCalc = Updater.ElectrostaticPhiUpdater {
    kPerpTimesRho = kPerpTimesRho,
    Te0 = Te0,
    useCutoffVelocities = true,
+}
+
+setPhiAtBoundaryCalc = Updater.SetPhiAtBoundaryUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+  elcMass = elcMass,
+  elcCharge = elcCharge,
 }
 
 -- updater to copy 1D field to 2D field
@@ -662,7 +680,7 @@ heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
    -- basis functions to use
    basis = basis_1d,
    ionMass = ionMass,
-   electronMass = electronMass,
+   electronMass = elcMass,
    -- Perpendicular temperature of ions and electrons
    tPerp = tPed,
 }
@@ -691,7 +709,7 @@ totalEnergyCalc = Updater.KineticTotalEnergyUpdater {
   onGrid = grid_1d,
   basis = basis_1d,
   ionMass = ionMass,
-  electronMass = electronMass,
+  electronMass = elcMass,
 }
 
 -- updater to move phi from discontinuous to continuous field
@@ -709,7 +727,7 @@ end
 function calcHamiltonianElc(curr, dt, phiIn, hamilOut)
    hamilOut:clear(0.0)
    copyPhi(copyTo2DElc, curr, dt, phiIn, hamilOut)
-   hamilOut:scale(-Lucee.ElementaryCharge/electronMass)
+   hamilOut:scale(-Lucee.ElementaryCharge/elcMass)
    hamilOut:accumulate(1.0, hamilKeElc)
 end
 -- compute hamiltonian for ions
@@ -800,7 +818,7 @@ function calcDiagnostics(curr, dt)
    --runUpdater(copyTo2DElc, curr, dt, {phi1d}, {phi2dElc})
    --runUpdater(copyTo2DIon, curr, dt, {phi1d}, {phi2dIon})
    -- Accumulate to hamiltonians to get 0.5*q/m*phi
-   --hamilElc:accumulate(0.5*Lucee.ElementaryCharge/electronMass, phi2dElc)
+   --hamilElc:accumulate(0.5*Lucee.ElementaryCharge/elcMass, phi2dElc)
    --hamilIon:accumulate(-0.5*ionCharge/ionMass, phi2dIon)
    
    -- copy hamiltonian to DG field
@@ -847,7 +865,8 @@ function rk3(tCurr, myDt)
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities1)
    
    calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities1, phi1dDg)
-   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1d)
+   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
+   runUpdater(setPhiAtBoundaryCalc, tCurr, myDt, {phi1dBeforeBc, cutoffVelocities1}, {phi1d})
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, hamilIon)
 
@@ -868,7 +887,8 @@ function rk3(tCurr, myDt)
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities2)
    
    calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities2, phi1dDg)
-   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1d)
+   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
+   runUpdater(setPhiAtBoundaryCalc, tCurr, myDt, {phi1dBeforeBc, cutoffVelocities2}, {phi1d})
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, hamilIon)
 
@@ -893,7 +913,8 @@ function rk3(tCurr, myDt)
    distfIon:copy(distf1Ion)
 
    calcPhiFromChargeDensity(tCurr, myDt, distfElc, distfIon, cutoffVelocities, phi1dDg)
-   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1d)
+   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
+   runUpdater(setPhiAtBoundaryCalc, tCurr, myDt, {phi1dBeforeBc, cutoffVelocities}, {phi1d})
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, hamilIon)
 
@@ -968,7 +989,8 @@ applyBc(0.0, 0.0, distfElc, distfIon, cutoffVelocities)
 
 -- calculate initial Hamiltonian
 calcPhiFromChargeDensity(0.0, 0.0, distfElc, distfIon, cutoffVelocities, phi1dDg)
-calcContinuousPhi(0.0, 0.0, phi1dDg, phi1d)
+calcContinuousPhi(0.0, 0.0, phi1dDg, phi1dBeforeBc)
+runUpdater(setPhiAtBoundaryCalc, 0.0, 0.0, {phi1dBeforeBc, cutoffVelocities}, {phi1d})
 calcHamiltonianElc(0.0, 0.0, phi1d, hamilElc)
 calcHamiltonianIon(0.0, 0.0, phi1d, hamilIon)
 -- compute initial diagnostics
