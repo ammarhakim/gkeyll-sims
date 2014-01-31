@@ -605,6 +605,11 @@ phi1dDg = DataStruct.Field1D {
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
 }
+phi1dDgBeforeCont = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- updater to compute phi electrostatically
 electrostaticPhiCalc = Updater.ElectrostaticPhiUpdater {
@@ -893,6 +898,7 @@ function rk3(tCurr, myDt)
    distfIon:copy(distf1Ion)
 
    calcPhiFromChargeDensity(tCurr, myDt, distfElc, distfIon, cutoffVelocities, phi1dDg)
+   phi1dDgBeforeCont:copy(phi1dDg)
    calcContinuousPhi(tCurr, myDt, phi1dDg, phi1d)
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, hamilIon)
@@ -959,8 +965,9 @@ function writeFields(frameNum, tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum) ,tCurr)
    cutoffVelocities:write( string.format("cutoffVelocities_%d.h5", frameNum) ,tCurr)
    --totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
-   --copyPotential(0.0, 0.0, phi1d, phi1dDg)
-   --phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   copyPotential(0.0, 0.0, phi1d, phi1dDg)
+   phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   phi1dDgBeforeCont:write(string.format("phiBeforeCont_%d.h5", frameNum), tCurr)
    momentumElc:write(string.format("mom1Elc_%d.h5", frameNum), tCurr)
    momentumIon:write(string.format("mom1Ion_%d.h5", frameNum), tCurr)
 end

@@ -1,5 +1,5 @@
 -- Input file for SOL problem with kinetic ions and electrons
--- PolyOrder 2 and kPerp = 0.4
+-- PolyOrder 2 and kPerp = 0.05
 
 -- polynomial order
 polyOrder = 2
@@ -583,6 +583,14 @@ phi1d = DataStruct.Field1D {
    -- write ghosts
    writeGhost = {0, 1},
 }
+-- continuous potential before it has the right boundary value
+phi1dBeforeBc = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numExclusiveNodes(),
+   ghost = {1, 1},
+   -- write ghosts
+   writeGhost = {0, 1},
+}
 
 phi2dElc = DataStruct.Field2D {
    onGrid = gridElc,
@@ -605,6 +613,11 @@ phi1dDg = DataStruct.Field1D {
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
 }
+phi1dDgBeforeCont = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- updater to compute phi electrostatically
 electrostaticPhiCalc = Updater.ElectrostaticPhiUpdater {
@@ -615,6 +628,13 @@ electrostaticPhiCalc = Updater.ElectrostaticPhiUpdater {
    kPerpTimesRho = kPerpTimesRho,
    Te0 = Te0,
    useCutoffVelocities = true,
+}
+
+setPhiAtBoundaryCalc = Updater.SetPhiAtBoundaryUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+  elcMass = electronMass,
+  elcCharge = eV,
 }
 
 -- updater to copy 1D field to 2D field
@@ -847,7 +867,8 @@ function rk3(tCurr, myDt)
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities1)
    
    calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities1, phi1dDg)
-   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1d)
+   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
+   runUpdater(setPhiAtBoundaryCalc, tCurr, myDt, {phi1dBeforeBc, cutoffVelocities1}, {phi1d})
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, hamilIon)
 
@@ -868,7 +889,8 @@ function rk3(tCurr, myDt)
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities2)
    
    calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities2, phi1dDg)
-   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1d)
+   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
+   runUpdater(setPhiAtBoundaryCalc, tCurr, myDt, {phi1dBeforeBc, cutoffVelocities2}, {phi1d})
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, hamilIon)
 
@@ -893,7 +915,10 @@ function rk3(tCurr, myDt)
    distfIon:copy(distf1Ion)
 
    calcPhiFromChargeDensity(tCurr, myDt, distfElc, distfIon, cutoffVelocities, phi1dDg)
-   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1d)
+   -- copy phi1dDg for output
+   -- phi1dDgBeforeCont:copy(phi1dDg)
+   calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
+   runUpdater(setPhiAtBoundaryCalc, tCurr, myDt, {phi1dBeforeBc, cutoffVelocities}, {phi1d})
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, hamilIon)
 
@@ -961,6 +986,9 @@ function writeFields(frameNum, tCurr)
    --totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
    --copyPotential(0.0, 0.0, phi1d, phi1dDg)
    --phi1dDg:write(string.format("phi_%d.h5", frameNum), tCurr)
+   --phi1dDgBeforeCont:write(string.format("phiBeforeCont_%d.h5", frameNum), tCurr)
+   --momentumElc:write(string.format("mom1Elc_%d.h5", frameNum), tCurr)
+   --momentumIon:write(string.format("mom1Ion_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
@@ -968,6 +996,8 @@ applyBc(0.0, 0.0, distfElc, distfIon, cutoffVelocities)
 
 -- calculate initial Hamiltonian
 calcPhiFromChargeDensity(0.0, 0.0, distfElc, distfIon, cutoffVelocities, phi1dDg)
+calcContinuousPhi(0.0, 0.0, phi1dDg, phi1dBeforeBc)
+runUpdater(setPhiAtBoundaryCalc, 0.0, 0.0, {phi1dBeforeBc, cutoffVelocities}, {phi1d})
 calcContinuousPhi(0.0, 0.0, phi1dDg, phi1d)
 calcHamiltonianElc(0.0, 0.0, phi1d, hamilElc)
 calcHamiltonianIon(0.0, 0.0, phi1d, hamilIon)
