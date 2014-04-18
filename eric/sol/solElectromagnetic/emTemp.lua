@@ -1,6 +1,5 @@
 -- Input file for SOL problem with kinetic ions and electrons
--- This test has positivty preservation turned off
--- PolyOrder 2 and kPerp = 0.2
+-- PolyOrder 2 and kPerp = 0.1
 
 -- polynomial order
 polyOrder = 2
@@ -21,7 +20,6 @@ ionCharge = Lucee.ElementaryCharge
 elcCharge = -Lucee.ElementaryCharge
 
 -- physical input parameters
-
 kPerpTimesRho = 0.1
 -- pedestal density (1/m^3)
 nPed = 5e19
