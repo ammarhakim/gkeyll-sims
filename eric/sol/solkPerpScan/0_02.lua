@@ -627,7 +627,6 @@ electrostaticPhiCalc = Updater.ElectrostaticPhiUpdater {
    basis = basis_1d,
    kPerpTimesRho = kPerpTimesRho,
    Te0 = Te0,
-   useCutoffVelocities = true,
 }
 
 setPhiAtBoundaryCalc = Updater.SetPhiAtBoundaryUpdater {
@@ -653,9 +652,9 @@ function copyPhi(copier, curr, dt, phi1, phi2)
 end
 
 -- compute phi from number density
-function calcPhiFromChargeDensity(curr, dt, distElcIn, distIonIn, cutoffVIn, phiOut)
+function calcPhiFromChargeDensity(curr, dt, distElcIn, distIonIn, phiOut)
    calcMoments(curr, dt, distElcIn, distIonIn)
-   runUpdater(electrostaticPhiCalc, curr, dt, {numDensityElc, numDensityIon, cutoffVIn}, {phiOut})
+   runUpdater(electrostaticPhiCalc, curr, dt, {numDensityElc, numDensityIon}, {phiOut})
 end
 
 -- Dynvectors to store 1st and 3rd moments at left and right edges
@@ -866,7 +865,7 @@ function rk3(tCurr, myDt)
    calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities1)
    
-   calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities1, phi1dDg)
+   calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, phi1dDg)
    calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
    runUpdater(setPhiAtBoundaryCalc, tCurr, myDt, {phi1dBeforeBc, cutoffVelocities1}, {phi1d})
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
@@ -888,7 +887,7 @@ function rk3(tCurr, myDt)
    calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities2)
    
-   calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities2, phi1dDg)
+   calcPhiFromChargeDensity(tCurr, myDt, distf1Elc, distf1Ion, phi1dDg)
    calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
    runUpdater(setPhiAtBoundaryCalc, tCurr, myDt, {phi1dBeforeBc, cutoffVelocities2}, {phi1d})
    calcHamiltonianElc(tCurr, myDt, phi1d, hamilElc)
@@ -914,7 +913,7 @@ function rk3(tCurr, myDt)
    distfElc:copy(distf1Elc)
    distfIon:copy(distf1Ion)
 
-   calcPhiFromChargeDensity(tCurr, myDt, distfElc, distfIon, cutoffVelocities, phi1dDg)
+   calcPhiFromChargeDensity(tCurr, myDt, distfElc, distfIon, phi1dDg)
    -- copy phi1dDg for output
    -- phi1dDgBeforeCont:copy(phi1dDg)
    calcContinuousPhi(tCurr, myDt, phi1dDg, phi1dBeforeBc)
@@ -995,7 +994,7 @@ calcMoments(0.0, 0.0, distfElc, distfIon)
 applyBc(0.0, 0.0, distfElc, distfIon, cutoffVelocities)
 
 -- calculate initial Hamiltonian
-calcPhiFromChargeDensity(0.0, 0.0, distfElc, distfIon, cutoffVelocities, phi1dDg)
+calcPhiFromChargeDensity(0.0, 0.0, distfElc, distfIon, phi1dDg)
 calcContinuousPhi(0.0, 0.0, phi1dDg, phi1dBeforeBc)
 runUpdater(setPhiAtBoundaryCalc, 0.0, 0.0, {phi1dBeforeBc, cutoffVelocities}, {phi1d})
 calcContinuousPhi(0.0, 0.0, phi1dDg, phi1d)
