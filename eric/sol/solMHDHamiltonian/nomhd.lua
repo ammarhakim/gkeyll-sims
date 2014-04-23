@@ -722,7 +722,7 @@ heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
    ionMass = ionMass,
    electronMass = elcMass,
    -- Perpendicular temperature of ions and electrons
-   tPerp = 0,
+   tPerp = tPed,
 }
 
 -- dynvector for energy computed using discrete hamiltonian
@@ -892,12 +892,12 @@ function calcHamiltonianIon(curr, dt, phiIn, aParallel1dIn, aSquared1dIn, hamilK
    hamilOut:accumulate(1.0, hamilKeOut)
 
    -- compute second order hamiltonian term
-   runUpdater(copyCToD, curr, dt, {phiIn}, {phi1dDg})
-   runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
-   runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
-   runUpdater(copyTo2DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian2d})
-   mhdHamiltonian2d:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
-   hamilOut:accumulate(1.0, mhdHamiltonian2d)
+   --runUpdater(copyCToD, curr, dt, {phiIn}, {phi1dDg})
+   --runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
+   --runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
+   --runUpdater(copyTo2DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian2d})
+   --mhdHamiltonian2d:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
+   --hamilOut:accumulate(1.0, mhdHamiltonian2d)
 end
 
 -- A HACK
