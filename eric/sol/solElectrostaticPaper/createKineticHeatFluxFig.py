@@ -17,7 +17,7 @@ rc('font', **font)
 filenumEnd = 5
 
 pathBase = '/Users/eshi/Research/gkeyllall/gkeyll-sims/eric/sol/solElectrostaticPaper/'
-fileBase = 'es_'
+fileBase = 'es1_'
 dataname = 'heatFluxAtEdge'
 
 # Make a plot
@@ -45,5 +45,5 @@ ax = fig.gca()
 ax.set_xscale('log', basex=10, subsx=np.arange(2,9,1))
 ax.xaxis.grid(True, which='both')
 
-plt.savefig('kinetic-elc-heat-flux.pdf', bbox_inches='tight')
+plt.savefig('kinetic-elc-heat-flux1.pdf', bbox_inches='tight')
 plt.show()

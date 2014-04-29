@@ -712,6 +712,8 @@ hamilKeIonDg = DataStruct.Field2D {
 
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
+-- dynvector for sheath power transmission coefficients
+sheathCoefficients = DataStruct.DynVector { numComponents = 7, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
@@ -723,6 +725,8 @@ heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
    electronMass = elcMass,
    -- Perpendicular temperature of ions and electrons
    tPerp = tPed,
+   -- Enable calculation of sheath coefficients
+   computeSheathCoefficient = true,
 }
 
 -- dynvector for energy computed using discrete hamiltonian
@@ -982,7 +986,7 @@ function calcDiagnostics(curr, dt)
    runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
    calcDiscontinuousField(curr, dt, phi1dAfterBc, phi1dDg)
    -- compute heat flux at edges
-   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc, momentsAtEdgesIon}, {heatFluxAtEdge})
+   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc, momentsAtEdgesIon}, {heatFluxAtEdge, sheathCoefficients})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -1129,6 +1133,7 @@ function writeFields(frameNum, tCurr)
    phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
+   sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
