@@ -267,7 +267,7 @@ initDistf = Updater.ProjectOnNodalBasis2D {
    evaluate = function(x,y,z,t)
      local backgroundTemp = initialIonTemp(x)
      local nHat = 2
-     local vTi = math.sqrt(backgroundTemp*eV/ionMass)
+     local vTi = math.sqrt(2*math.pi/(math.pi-1)*backgroundTemp*eV/ionMass)
 
      if x > lSource/2 then
        return nHat*maxwellianRight(vTi, 0.0, x, y)

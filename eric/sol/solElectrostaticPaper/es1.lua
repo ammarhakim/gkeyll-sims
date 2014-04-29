@@ -27,7 +27,7 @@ nPed = 5e19
 -- pedestal (source) temperature (eV)
 tPed = 1500
 -- Fixed value of Te that must be independent of time (eV)
-Te0 = 150
+Te0 = 75
 -- ELM pulse duration (seconds)
 tELM = 200e-6
 -- Parallel length (m)
@@ -69,7 +69,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 10e-6
+tEnd = 350e-6
 nFrames = 5
 
 -- A generic function to run an updater.
@@ -319,7 +319,7 @@ initDistfIon = Updater.ProjectOnNodalBasis2D {
    evaluate = function(x,y,z,t)
      local backgroundTemp = initialIonTemp(x)
      local nHat = 2
-     local vTi = math.sqrt(backgroundTemp*eV/ionMass)
+     local vTi = math.sqrt(2*math.pi/(math.pi-1)*backgroundTemp*eV/ionMass)
 
      if x > lSource/2 then
        return maxwellianRight(nHat, ionMass, vTi, y)
@@ -615,7 +615,7 @@ phi1d = DataStruct.Field1D {
    numComponents = basis_1d:numExclusiveNodes(),
    ghost = {2, 2},
 }
--- continuous potential before it has the right boundary value
+-- continuous potential after it has been modified
 phi1dAfterBc = DataStruct.Field1D {
    onGrid = grid_1d,
    numComponents = basis_1d:numExclusiveNodes(),
@@ -713,7 +713,7 @@ hamilKeIonDg = DataStruct.Field2D {
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
 -- dynvector for sheath power transmission coefficients
-sheathCoefficients = DataStruct.DynVector { numComponents = 3, }
+sheathCoefficients = DataStruct.DynVector { numComponents = 7, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
@@ -724,7 +724,9 @@ heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdgeUpdater {
    ionMass = ionMass,
    electronMass = elcMass,
    -- Perpendicular temperature of ions and electrons
-   tPerp = 0,
+   tPerp = tPed,
+   -- Enable calculation of sheath coefficients
+   computeSheathCoefficient = true,
 }
 
 -- dynvector for energy computed using discrete hamiltonian
@@ -880,8 +882,8 @@ function calcHamiltonianIon(curr, dt, phiIn, aParallel1dIn, aSquared1dIn, hamilK
    -- clear out fields (is this needed?)
    hamilOut:clear(0.0)
    hamilKeOut:clear(0.0)
-   mhdHamiltonian1d:clear(0.0)
-   mhdHamiltonian2d:clear(0.0)
+   aSquared2dIon:clear(0.0)
+   aParallel2dIon:clear(0.0)
 
    -- Accumulate q*Phi contribution to hamiltonian
    copyCont1DTo2D(copyTo2DIon, curr, dt, phiIn, hamilOut)
@@ -974,44 +976,17 @@ end
 
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
-
    -- take the KE part of the hamiltonian and copy it to a DG field
    runUpdater(copyCToDElc2D, 0.0, 0.0, {hamilKeElc}, {hamilKeElcDg})
    runUpdater(copyCToDIon2D, 0.0, 0.0, {hamilKeIon}, {hamilKeIonDg})
    -- compute moments at edges
    runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilKeElcDg, aParallel1dDg}, {momentsAtEdgesElc})
    runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon, hamilKeIonDg, aParallel1dDg}, {momentsAtEdgesIon})
-   
-   -- modify phi so that phi(edge) = phi_s
+   -- modify phi so that is is equal to phi_s at edge
    runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
-   calcDiscontinuousField(0.0, 0.0, phi1dAfterBc, phi1dDg)
+   calcDiscontinuousField(curr, dt, phi1dAfterBc, phi1dDg)
    -- compute heat flux at edges
    runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc, momentsAtEdgesIon}, {heatFluxAtEdge, sheathCoefficients})
-
-   calcDiscontinuousField(curr, dt, mhdHamiltonian1d, mhdHamiltonian1dDg)
-
-   -- copy hamiltonian to DG field
-   runUpdater(copyCToDElc2D, curr, dt, {hamilElc}, {hamilElcDg})
-   runUpdater(copyCToDIon2D, curr, dt, {hamilIon}, {hamilIonDg})
-   -- accumulate perpendicular energy terms
-   --hamilElcDg:accumulate(1.0, hamilPerpElcDg)
-   --hamilIonDg:accumulate(1.0, hamilPerpIonDg)
-   -- scale factors so that when integrated in momentum, we get the right units
-   hamilElcDg:scale(1/elcMass)
-   hamilIonDg:scale(1/ionMass)
-   -- compute domain energy using discrete hamiltonian
-   runUpdater(hamilElcEnergyCalc, curr, dt, {distfElc, hamilElcDg}, {hamilElcEnergy})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, hamilIonDg}, {hamilIonEnergy})
-   -- compute source power using discrete hamiltonian
-   runUpdater(hamilElcEnergyCalc, curr, dt, {particleSourceElc, hamilElcDg}, {hamilSrcElcEnergy})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {particleSourceIon, hamilIonDg}, {hamilSrcIonEnergy})
-   -- compute MHD hamiltonian contribution to total energy
-   mhdHamiltonian2d:scale(1/ionMass)
-   runUpdater(copyCToDIon2D, curr, dt, {mhdHamiltonian2d}, {mhdHamiltonian2dDg})
-   runUpdater(hamilIonEnergyCalc, curr, dt, {distfIon, mhdHamiltonian2dDg}, {mhdHamiltonianEnergy})
-   
-   runUpdater(totalEnergyCalc, curr, dt, {heatFluxAtEdge, hamilElcEnergy, 
-    hamilIonEnergy, hamilSrcElcEnergy, hamilSrcIonEnergy}, {totalEnergy})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -1045,7 +1020,7 @@ function rk3(tCurr, myDt)
    -- Compute Hamiltonian
    calcHamiltonianElc(tCurr, myDt, phi1d, aParallel1d, aSquared1d, hamilKeElc, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, aParallel1d, aSquared1d, hamilKeIon, hamilIon)
-   
+
    -- RK stage 2
    statusElc, dtSuggestedElc = runUpdater(vlasovSolverElc, tCurr, myDt, {distf1Elc, hamilElc}, {distfNewElc})
    statusIon, dtSuggestedIon = runUpdater(vlasovSolverIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
@@ -1158,22 +1133,7 @@ function writeFields(frameNum, tCurr)
    phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
-   mhdHamiltonianEnergy:write(string.format("mhdHamiltonianEnergy_%d.h5", frameNum), tCurr)
-   totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
-   hamilSrcElcEnergy:write(string.format("hamilSrcElcEnergy_%d.h5", frameNum), tCurr)
-   hamilSrcIonEnergy:write(string.format("hamilSrcIonEnergy_%d.h5", frameNum), tCurr)
-   mhdHamiltonian1dDg:write( string.format("mhdHamiltonian_%d.h5", frameNum), tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
-   --momentsAtEdgesElc:write( string.format("momentsAtEdgesElc_%d.h5", frameNum), tCurr)
-   --momentsAtEdgesIon:write( string.format("momentsAtEdgesIon_%d.h5", frameNum), tCurr)
-   --totalEnergy:write( string.format("totalEnergy_%d.h5", frameNum) ,tCurr)
-   --mom1Ion:write( string.format("mom1Ion_%d.h5", frameNum), tCurr)
-   --mom1Elc:write( string.format("mom1Elc_%d.h5", frameNum), tCurr)
-   --mom3Ion:write( string.format("mom3Ion_%d.h5", frameNum), tCurr)
-   --mom3Elc:write( string.format("mom3Elc_%d.h5", frameNum), tCurr)
-   --aParallel1dDg:write(string.format("a_%d.h5", frameNum), tCurr)
-   --mom0ElcSource:write(string.format("mom0ElcSource_%d.h5", frameNum), tCurr)
-   --mom1ElcSource:write(string.format("mom1ElcSource_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
@@ -1188,8 +1148,6 @@ runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1
 -- calculate initial Hamiltonian
 calcHamiltonianElc(0.0, 0.0, phi1d, aParallel1d, aSquared1d, hamilKeElc, hamilElc)
 calcHamiltonianIon(0.0, 0.0, phi1d, aParallel1d, aSquared1d, hamilKeIon, hamilIon)
--- convert dPhi to Phi
---runUpdater(setPhiAtBoundaryCalc, 0.0, 0.0, {phi1dBeforeBc, cutoffVelocities}, {phi1d})
 -- compute initial diagnostics
 calcDiagnostics(0.0, 0.0)
 -- write out initial conditions
