@@ -55,6 +55,7 @@ kPerp = kPerpTimesRho/rho_i
 cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
 Sn   = A*nPed*cPed/lSource
+print(Sn)
 
 -- domain extents
 XL, XU = -lParallel, lParallel
