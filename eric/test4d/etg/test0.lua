@@ -9,31 +9,43 @@ cfl = 0.1
 tStart = 0.0
 tEnd = 1.0
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 4
+nFrames = 1
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
-elcCharge = -1.0
-ionCharge = 1.0
-elcMass = 1.0
-ionMass = 1836
-B = 1
-MU = 1
-ionTemp = 1 -- background ion temperature
+eV = Lucee.ElementaryCharge
+kineticCharge = -Lucee.ElementaryCharge
+ionCharge = Lucee.ElementaryCharge
+kineticMass = Lucee.ElectronMass
+adiabaticMass = 2*Lucee.ProtonMass
+kineticTemp = 2072 -- [eV]
+adiabaticTemp = 2072 -- [ev]
+B0 = 1.91 -- [T]
+R0 = 1.313 -- [m]
+a = 0.4701 -- [m]
+n0 = 4.992*10^(19) -- [1/m^3]
+-- derived parameters
+R = R0 + 0.5*a
+vtKinetic = math.sqrt(kineticTemp*eV/kineticMass)
+c_s = math.sqrt(kineticTemp*eV/kineticMass)
+omega_s = math.abs(kineticCharge*B0/kineticMass)
+rho_s = c_s/omega_s
+deltaR = 32*rho_s
+L_T = R/10
 -- grid parameters: number of cells
 N_X = 8
 N_Y = 8
 N_VPARA = 8
-N_MU = 8
+N_MU = 2
 -- grid parameters: domain extent
-X_LOWER = 0
-X_UPPER = 1
-Y_LOWER = 0
-Y_UPPER = 1
-VPARA_LOWER = 0
-VPARA_UPPER = 1
+X_LOWER = R
+X_UPPER = R+deltaR
+Y_LOWER = -deltaR/2
+Y_UPPER = deltaR/2
+VPARA_LOWER = -vtKinetic
+VPARA_UPPER = vtKinetic
 MU_LOWER = 0
-MU_UPPER = 1
+MU_UPPER = 4*kineticMass*VPARA_UPPER*VPARA_UPPER/(2*B0)
 -- full 4d phase space grid
 grid_4d = Grid.RectCart4D {
    lower = {X_LOWER, Y_LOWER, VPARA_LOWER, MU_LOWER},
@@ -85,28 +97,65 @@ fNewDup = fNew:duplicate()
 -- to store background distfElc
 backgroundf = f:duplicate()
 
-function pulse(x,y,z,z1)
-   local xc, yc, zc, z1c = 0.5, 0.5, 0.5, 0.5
-   local r2 = (x-xc)^2 + (y-yc)^2 + (z-zc)^2 + (z1-z1c)^2
-   return math.exp(-75*r2)
+function fProfile(x,y,v,mu)
+  return n0*(2*math.pi*kineticTemp*eV/kineticMass)^(-3/2)*math.exp(-kineticMass*v^2/(2*kineticTemp*eV))*math.exp(-mu*bFieldProfile(x,y)/(kineticTemp*eV))
 end
 
 -- initialize electron distribution function
-initElc = Updater.EvalOnNodes4D {
+initKineticF = Updater.EvalOnNodes4D {
    onGrid = grid_4d,
    basis = basis_4d,
    shareCommonNodes = false,
    -- function to use for initialization
-   evaluate = function (x,y,z,z1,t)
-		 return pulse(x,y,z,z1)
-	      end
+   evaluate = function (x,y,v,mu,t)
+		 return fProfile(x,y,v,mu)
+	 end
 }
-runUpdater(initElc, 0.0, 0.0, {}, {f})
+runUpdater(initKineticF, 0.0, 0.0, {}, {f})
+
+function bFieldProfile(x)
+  return B0*R/x
+end
+
+-- Magnetic Field (2D)
+bField2d = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+-- Updater to initialize bfield2d
+initbField2d = Updater.EvalOnNodes2D {
+  onGrid = grid_4d,
+  basis = basis_4d,
+  shareCommonNodes = false,
+  evaluate = function (x,y,t)
+    return bFieldProfile(x)
+  end
+}
+runUpdater(initbField2d, 0.0, 0.0, {}, {bField2d})
+
+-- Jacobian Factor (4D)
+jacobianField = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
+-- Updater to initialize Jacobian
+initJacobian = Updater.EvalOnNodes4D {
+   onGrid = grid_4d,
+   basis = basis_4d,
+   shareCommonNodes = false,
+   evaluate = function (x,y,vPara,mu,t)
+      return kineticMass*kineticMass*bFieldProfile(x,y)
+   end
+}
+runUpdater(initJacobian, 0.0, 0.0, {}, {jacobianField})
 
 -- define equation to solve
 advectionEqn = PoissonBracketEquation.AdvectionEquation4D {
 }
 gyroEqn = PoissonBracketEquation.GyroEquation4D {
+  bParallelY = 
 }
 
 pbSlvr = Updater.PoissonBracket4D {
@@ -118,9 +167,6 @@ pbSlvr = Updater.PoissonBracket4D {
    -- equation to solve
    equation = advectionEqn,
 }
-
-function bFieldProfile(x,y)
-end
 
 -- Hamiltonian
 hamil = DataStruct.Field4D {
@@ -140,7 +186,7 @@ initHamilKE = Updater.EvalOnNodes4D {
    basis = basis_4d,
    shareCommonNodes = false,
    evaluate = function (x,y,vPara,mu,t)
-      return 0.5*elcMass*vPara*vPara + mu*bFieldProfile(x,y)
+      return 0.5*kineticMass*vPara*vPara + mu*bFieldProfile(x,y)
    end
 }
 runUpdater(initHamilKE, 0.0, 0.0, {}, {hamilKE})
@@ -157,7 +203,7 @@ numDensityElc = DataStruct.Field2D {
    ghost = {1, 1},
 }
 -- to compute number density
-numDensityCalc = Updater.DistFuncMomentCalc2D {
+numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- 4D phase-space grid 
    onGrid = grid_4d,
    -- 4D phase-space basis functions
@@ -194,12 +240,44 @@ phi4d = DataStruct.Field4d {
 
 -- apply boundary conditions to a 4d field
 function applyBc(fld)
-   fld:applyPeriodicBc(0)
-   fld:applyPeriodicBc(1)
-   fld:applyCopyBc(2, "lower")
-   fld:applyCopyBc(2, "upper")
-   fld:applyCopyBc(3, "lower")
-   fld:applyCopyBc(3, "upper")
+  fld:applyPeriodicBc(0)
+  fld:applyPeriodicBc(1)
+  fld:applyCopyBc(2, "lower")
+  fld:applyCopyBc(2, "upper")
+  fld:applyCopyBc(3, "lower")
+  fld:applyCopyBc(3, "upper")
+end
+
+function applyBcToFluctuatingPotential(fld)
+  fld:applyPeriodicBc(0)
+  fld:applyPeriodicBc(1)
+end
+
+function applyBcToBackgroundPotential(fld)
+  fld:applyCopyBc(0, "lower")
+  fld:applyCopyBc(0, "upper")
+  fld:applyCopyBc(1, "lower")
+  fld:applyCopyBc(1, "upper")
+end
+
+function applyBcToFluctuatingDistF(fld)
+  fld:applyPeriodicBc(0)
+  fld:applyPeriodicBc(1)
+  fld:applyCopyBc(2, "lower")
+  fld:applyCopyBc(2, "upper")
+  fld:applyCopyBc(3, "lower")
+  fld:applyCopyBc(3, "upper")
+end
+
+function applyBcToBackgroundDistF(fld)
+  fld:applyCopyBc(0, "lower")
+  fld:applyCopyBc(0, "upper")
+  fld:applyCopyBc(1, "lower")
+  fld:applyCopyBc(1, "upper")
+  fld:applyCopyBc(2, "lower")
+  fld:applyCopyBc(2, "upper")
+  fld:applyCopyBc(3, "lower")
+  fld:applyCopyBc(3, "upper")
 end
 
 function calcPotential()
@@ -209,7 +287,7 @@ function calcHamiltonian(hamilKeIn, phiIn, hamilOut)
   hamilOut:clear(0.0)
   -- copy potential to 4d field
   runUpdater(copy2dTo4d, 0.0, 0.0, {phiIn}, phi4d)
-  hamilOut:accumulate(elcCharge, phi4d)
+  hamilOut:accumulate(kineticCharge, phi4d)
   hamilOut:accumulate(1.0, hamilKeIn)
 end
 
@@ -264,6 +342,7 @@ function rk3(tCurr, myDt)
 end
 
 -- function to advance solution from tStart to tEnd
+-- TODO: hamil duplicates, revert phi
 function advanceFrame(tStart, tEnd, initDt)
    local step = 1
    local tCurr = tStart
