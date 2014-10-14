@@ -8,10 +8,10 @@ polyOrder = 1
 cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 2e-9
---tEnd = 6.60129e-09
-dtSuggested = 0.1*1e-6 -- initial time-step to use (will be adjusted)
-nFrames = 4
+--tEnd = 8.06741e-12
+tEnd = 1e-7
+dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
+nFrames = 1
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -36,7 +36,7 @@ deltaR    = 32*rho_s
 L_T       = R/10
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 4
+N_X = 8
 N_Y = 8
 N_VPARA = 4
 N_MU = 2
@@ -60,6 +60,17 @@ function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
       updater:setOut(outFlds)
    end
    return updater:advance(currTime+timeStep)
+end
+
+function applyCopyInAllDir(fld)
+  fld:applyCopyBc(0, "lower")
+  fld:applyCopyBc(0, "upper")
+  fld:applyCopyBc(1, "lower")
+  fld:applyCopyBc(1, "upper")
+  fld:applyCopyBc(2, "lower")
+  fld:applyCopyBc(2, "upper")
+  fld:applyCopyBc(3, "lower")
+  fld:applyCopyBc(3, "upper")
 end
 
 -- full 4d phase space grid
@@ -100,7 +111,6 @@ fNewDup = fNew:duplicate()
 -- to store background distfElc
 fBackground = f:duplicate()
 fFluctuating = f:duplicate()
-fInitialPerturb = f:duplicate()
 
 function bFieldProfile(x)
   return B0*R/x
@@ -108,10 +118,6 @@ end
 
 function kineticTempProfile(x)
   return kineticTemp*(1 - (x-R)/L_T)
-end
-
-function perturbDensityProfile(x,y)
-  return n0*1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
 end
 
 function fProfile(x,y,v,mu)
@@ -131,18 +137,6 @@ initKineticF = Updater.EvalOnNodes4D {
 	 end
 }
 runUpdater(initKineticF, 0.0, 0.0, {}, {f})
-
--- initialize electron distribution function
-initKineticFPerturb = Updater.EvalOnNodes4D {
-   onGrid = grid_4d,
-   basis = basis_4d,
-   shareCommonNodes = false,
-   -- function to use for initialization
-   evaluate = function (x,y,v,mu,t)
-		 return perturbDensityProfile(x,y)*fProfile(x,y,v,mu)
-	 end
-}
-runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
 
 -- Magnetic Field (2D)
 bField2d = DataStruct.Field2D {
@@ -197,7 +191,7 @@ bStarYField = DataStruct.Field4D {
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
--- Updater to initialize bStarY
+-- Updater to initialize bstarY
 initbStarY = Updater.EvalOnNodes4D {
   onGrid = grid_4d,
   basis = basis_4d,
@@ -358,6 +352,7 @@ function calcPotential(kineticN, adiabaticN, nAtCenter, phiOut)
   phiOut:copy(kineticN)
   phiOut:accumulate(-1.0, adiabaticN)
   phiOut:scale(adiabaticTemp/nAtCenter)
+  phiOut:clear(0.0)
 end
 
 function calcHamiltonian(hamilKeIn, phi2dIn, hamilOut)
@@ -371,10 +366,9 @@ end
 -- dynvector for field energy
 fieldEnergy = DataStruct.DynVector { numComponents = 1, }
 -- to compute field energy
-fieldEnergyCalc = Updater.IntegrateGeneralField2D {
+fieldEnergyCalc = Updater.NormGrad2D {
    onGrid = grid_2d,
    basis = basis_2d,
-   moment = 2,
 }
 
 function calcNumDensity(fIn, nOut)
@@ -384,6 +378,7 @@ end
 
 function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi2dSmoothed}, {fieldEnergy})
+  calcNumDensity(f, numDensityKinetic)
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -502,7 +497,6 @@ function writeFields(frameNum, tCurr)
 end
 
 applyBcToBackgroundDistF(f)
-
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
 -- Compute total number of particles
@@ -511,7 +505,6 @@ runUpdater(totalPtclCalc, 0.0, 0.0, {numDensityKinetic}, {totalPtcl})
 scaleFactor = deltaR*deltaR*n0/totalPtcl:lastInsertedData()
 -- Scale fields and recalculate density
 f:scale(scaleFactor)
-Lucee.logInfo (string.format("-- Scaling distribution function by  %f", scaleFactor))
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
 numDensityAdiabatic:copy(numDensityKinetic)
@@ -527,15 +520,6 @@ phi2dBackground:copy(phi2dSmoothed)
 -- Store background f
 fBackground:copy(f)
 
--- Scale f perturbation and add to f
-f:accumulate(scaleFactor, fInitialPerturb)
--- Apply boundary conditions
-applyBcToTotalDistF(f)
--- Compute potential
-calcNumDensity(f, numDensityKinetic)
-calcPotential(numDensityKinetic, numDensityAdiabatic, n0, phi2d)
-applyBcToTotalPotential(phi2d)
-runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
 calcHamiltonian(hamilKE, phi2dSmoothed, hamil)
 
 -- Compute diagnostics for t = 0
