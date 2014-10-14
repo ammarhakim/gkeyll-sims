@@ -1,6 +1,9 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 
+--decomp4d = DecompRegionCalc4D.CartProd {cuts = {1,1,1,1}, periodicDirs={0,1}}
+--decomp2d = DecompRegionCalc2D.CartProd {cuts = {1,1}}
+
 -- polynomial order
 polyOrder = 1
 
@@ -68,11 +71,35 @@ grid_4d = Grid.RectCart4D {
    upper = {X_UPPER, Y_UPPER, VPARA_UPPER, MU_UPPER},
    cells = {N_X, N_Y, N_VPARA, N_MU},
 }
+grid_fluct_4d = Grid.RectCart4D {
+   lower = {X_LOWER, Y_LOWER, VPARA_LOWER, MU_LOWER},
+   upper = {X_UPPER, Y_UPPER, VPARA_UPPER, MU_UPPER},
+   cells = {N_X, N_Y, N_VPARA, N_MU},
+   periodicDirs = {0, 1},
+}
+grid_back_4d = Grid.RectCart4D {
+   lower = {X_LOWER, Y_LOWER, VPARA_LOWER, MU_LOWER},
+   upper = {X_UPPER, Y_UPPER, VPARA_UPPER, MU_UPPER},
+   cells = {N_X, N_Y, N_VPARA, N_MU},
+   periodicDirs = {1},
+}
 -- 2d spatial grid
 grid_2d = Grid.RectCart2D {
    lower = {X_LOWER, Y_LOWER},
    upper = {X_UPPER, Y_UPPER},
    cells = {N_X, N_Y},
+}
+grid_fluct_2d = Grid.RectCart2D {
+   lower = {X_LOWER, Y_LOWER},
+   upper = {X_UPPER, Y_UPPER},
+   cells = {N_X, N_Y},
+   periodicDirs = {0, 1},
+}
+grid_back_2d = Grid.RectCart2D {
+   lower = {X_LOWER, Y_LOWER},
+   upper = {X_UPPER, Y_UPPER},
+   cells = {N_X, N_Y},
+   periodicDirs = {1},
 }
 -- create 4d basis functions
 basis_4d = NodalFiniteElement4D.SerendipityElement {
@@ -87,7 +114,7 @@ basis_2d = NodalFiniteElement2D.SerendipityElement {
 
 -- distribution function for electrons
 f = DataStruct.Field4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
@@ -99,7 +126,11 @@ fNew = f:duplicate()
 fNewDup = fNew:duplicate()
 -- to store background distfElc
 fBackground = f:duplicate()
-fFluctuating = f:duplicate()
+fFluctuating = DataStruct.Field4D {
+   onGrid = grid_fluct_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 fInitialPerturb = f:duplicate()
 
 function bFieldProfile(x)
@@ -282,13 +313,17 @@ totalPtclCalc = Updater.IntegrateGeneralField2D {
 
 -- to store the electrostatic potential on spatial grid
 phi2d = DataStruct.Field2D {
-   onGrid = grid_2d,
+   onGrid = grid_back_2d,
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
 phi2dSmoothed = phi2d:duplicate()
 phi2dBackground = phi2d:duplicate()
-phi2dFluctuating = phi2d:duplicate()
+phi2dFluctuating = DataStruct.Field2D {
+   onGrid = grid_fluct_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 -- to store electrostatic potential for addition to hamiltonian
 phi4d = DataStruct.Field4D {
   onGrid = grid_4d,
@@ -314,14 +349,13 @@ function applyBcToTotalPotential(fld)
 end
 
 function applyBcToFluctuatingPotential(fld)
-  fld:applyPeriodicBc(0)
-  fld:applyPeriodicBc(1)
+  fld:sync()
 end
 
 function applyBcToBackgroundPotential(fld)
   fld:applyCopyBc(0, "lower")
   fld:applyCopyBc(0, "upper")
-  fld:applyPeriodicBc(1)
+  fld:sync()
 end
 
 function applyBcToTotalDistF(fld)
@@ -336,22 +370,21 @@ function applyBcToTotalDistF(fld)
 end
 
 function applyBcToFluctuatingDistF(fld)
-  fld:applyPeriodicBc(0)
-  fld:applyPeriodicBc(1)
   fld:applyCopyBc(2, "lower")
   fld:applyCopyBc(2, "upper")
   fld:applyCopyBc(3, "lower")
   fld:applyCopyBc(3, "upper")
+  fld:sync()
 end
 
 function applyBcToBackgroundDistF(fld)
   fld:applyCopyBc(0, "lower")
   fld:applyCopyBc(0, "upper")
-  fld:applyPeriodicBc(1)
   fld:applyCopyBc(2, "lower")
   fld:applyCopyBc(2, "upper")
   fld:applyCopyBc(3, "lower")
   fld:applyCopyBc(3, "upper")
+  fld:sync()
 end
 
 function calcPotential(kineticN, adiabaticN, nAtCenter, phiOut)

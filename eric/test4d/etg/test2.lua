@@ -8,10 +8,10 @@ polyOrder = 1
 cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 2e-9
+tEnd = 1e-9
 --tEnd = 6.60129e-09
 dtSuggested = 0.1*1e-6 -- initial time-step to use (will be adjusted)
-nFrames = 4
+nFrames = 1
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -111,13 +111,13 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y)
-  return n0*1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  return n0*(1 + 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y))
 end
 
 function fProfile(x,y,v,mu)
   return (2*math.pi*kineticTempProfile(x)*eV/kineticMass)^(-3/2)*
     math.exp(-kineticMass*v^2/(2*kineticTempProfile(x)*eV))*
-    math.exp(-math.abs(mu)*bFieldProfile(x)/(kineticTempProfile(x)*eV))
+    math.exp(-mu*bFieldProfile(x)/(kineticTempProfile(x)*eV))
 end
 
 -- initialize electron distribution function
@@ -248,7 +248,7 @@ initHamilKE = Updater.EvalOnNodes4D {
    basis = basis_4d,
    shareCommonNodes = false,
    evaluate = function (x,y,vPara,mu,t)
-      return 0.5*kineticMass*vPara*vPara + math.abs(mu)*bFieldProfile(x)
+      return 0.5*kineticMass*vPara*vPara + mu*bFieldProfile(x)
    end
 }
 runUpdater(initHamilKE, 0.0, 0.0, {}, {hamilKE})
@@ -371,10 +371,9 @@ end
 -- dynvector for field energy
 fieldEnergy = DataStruct.DynVector { numComponents = 1, }
 -- to compute field energy
-fieldEnergyCalc = Updater.IntegrateGeneralField2D {
+fieldEnergyCalc = Updater.NormGrad2D {
    onGrid = grid_2d,
    basis = basis_2d,
-   moment = 2,
 }
 
 function calcNumDensity(fIn, nOut)
@@ -501,7 +500,7 @@ function writeFields(frameNum, tCurr)
    phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
 end
 
-applyBcToBackgroundDistF(f)
+applyBcToBackgroundPotential(f)
 
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
@@ -511,7 +510,6 @@ runUpdater(totalPtclCalc, 0.0, 0.0, {numDensityKinetic}, {totalPtcl})
 scaleFactor = deltaR*deltaR*n0/totalPtcl:lastInsertedData()
 -- Scale fields and recalculate density
 f:scale(scaleFactor)
-Lucee.logInfo (string.format("-- Scaling distribution function by  %f", scaleFactor))
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
 numDensityAdiabatic:copy(numDensityKinetic)
@@ -535,20 +533,10 @@ applyBcToTotalDistF(f)
 calcNumDensity(f, numDensityKinetic)
 calcPotential(numDensityKinetic, numDensityAdiabatic, n0, phi2d)
 applyBcToTotalPotential(phi2d)
+phi2dSmoothed:copy(phi2d)
 runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
-calcHamiltonian(hamilKE, phi2dSmoothed, hamil)
+--calcHamiltonian(hamilKE, phi2dSmoothed, hamil)
 
 -- Compute diagnostics for t = 0
-calcDiagnostics(0.0, 0.0)
+--calcDiagnostics(0.0, 0.0)
 writeFields(0,0)
-
-tCurr = tStart
-fNew:copy(f)
-
-for frame = 1, nFrames do
-  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
-  dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
-  tCurr = tCurr+tFrame
-  writeFields(frame, tCurr)
-  Lucee.logInfo ("")
-end
