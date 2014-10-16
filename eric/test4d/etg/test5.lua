@@ -1,5 +1,6 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
+-- High resolution test
 
 --decomp4d = DecompRegionCalc4D.CartProd {cuts = {1,1,1,1}}
 --decomp2d = DecompRegionCalc2D.CartProd {cuts = {1,1}}
@@ -11,7 +12,7 @@ polyOrder = 1
 cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 900e-9
+tEnd = 1e-6
 --tEnd = 6.60129e-09
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 5
@@ -39,10 +40,10 @@ deltaR    = 32*rho_s
 L_T       = R/10
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 4
-N_Y = 8
-N_VPARA = 4
-N_MU = 2
+N_X = 32
+N_Y = 32
+N_VPARA = 8
+N_MU = 4
 -- grid parameters: domain extent
 X_LOWER = R
 X_UPPER = R + deltaR
