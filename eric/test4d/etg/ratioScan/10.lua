@@ -419,6 +419,19 @@ fieldEnergyCalc = Updater.IntegrateGeneralField2D {
    moment = 2,
 }
 
+-- to scale distribution function
+scaleInitDistF = Updater.ETGInitializeDensity {
+  -- 4D phase-space grid 
+   onGrid = grid_4d,
+   -- 4D phase-space basis functions
+   basis4d = basis_4d,
+   -- 2D spatial basis functions
+   basis2d = basis_2d,
+   -- Desired constant density
+   constantDensity = n0,
+   polyOrder = polyOrder,
+}
+
 function calcNumDensity(fIn, nOut)
   runUpdater(numDensityCalc, 0.0, 0.0, {fIn, bField2d}, {nOut})
   nOut:scale(2*math.pi/kineticMass)
@@ -554,13 +567,10 @@ applyBcToBackgroundDistF(f)
 
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
--- Compute total number of particles
-runUpdater(totalPtclCalc, 0.0, 0.0, {numDensityKinetic}, {totalPtcl})
--- Compute fraction to multiply distribution function by to get desired density
-scaleFactor = deltaR*deltaR*n0/totalPtcl:lastInsertedData()
--- Scale fields and recalculate density
-f:scale(scaleFactor)
-Lucee.logInfo (string.format("-- Scaling distribution function by  %f", scaleFactor))
+-- Scale distribution function and perturbation
+runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
+runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {fInitialPerturb})
+-- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
 numDensityAdiabatic:copy(numDensityKinetic)
@@ -576,8 +586,8 @@ phi2dBackground:copy(phi2dSmoothed)
 -- Store background f
 fBackground:copy(f)
 
--- Scale f perturbation and add to f
-f:accumulate(scaleFactor, fInitialPerturb)
+-- Add perturbtion to f
+f:accumulate(1.0, fInitialPerturb)
 -- Apply boundary conditions
 applyBcToTotalDistF(f)
 -- Compute potential
