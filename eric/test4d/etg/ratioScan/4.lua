@@ -12,6 +12,7 @@ cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
 tEnd = 1e-6
+--tEnd = 6.60129e-09
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 5
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -35,7 +36,7 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/10
+L_T       = R/4
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
@@ -419,19 +420,6 @@ fieldEnergyCalc = Updater.IntegrateGeneralField2D {
    moment = 2,
 }
 
--- to scale distribution function
-scaleInitDistF = Updater.ETGInitializeDensity {
-  -- 4D phase-space grid 
-   onGrid = grid_4d,
-   -- 4D phase-space basis functions
-   basis4d = basis_4d,
-   -- 2D spatial basis functions
-   basis2d = basis_2d,
-   -- Desired constant density
-   constantDensity = n0,
-   polyOrder = polyOrder,
-}
-
 function calcNumDensity(fIn, nOut)
   runUpdater(numDensityCalc, 0.0, 0.0, {fIn, bField2d}, {nOut})
   nOut:scale(2*math.pi/kineticMass)
@@ -567,10 +555,13 @@ applyBcToBackgroundDistF(f)
 
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
--- Scale distribution function and perturbation
-runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
-runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {fInitialPerturb})
--- Recalculate number density
+-- Compute total number of particles
+runUpdater(totalPtclCalc, 0.0, 0.0, {numDensityKinetic}, {totalPtcl})
+-- Compute fraction to multiply distribution function by to get desired density
+scaleFactor = deltaR*deltaR*n0/totalPtcl:lastInsertedData()
+-- Scale fields and recalculate density
+f:scale(scaleFactor)
+Lucee.logInfo (string.format("-- Scaling distribution function by  %f", scaleFactor))
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
 numDensityAdiabatic:copy(numDensityKinetic)
@@ -586,8 +577,8 @@ phi2dBackground:copy(phi2dSmoothed)
 -- Store background f
 fBackground:copy(f)
 
--- Add perturbtion to f
-f:accumulate(1.0, fInitialPerturb)
+-- Scale f perturbation and add to f
+f:accumulate(scaleFactor, fInitialPerturb)
 -- Apply boundary conditions
 applyBcToTotalDistF(f)
 -- Compute potential
