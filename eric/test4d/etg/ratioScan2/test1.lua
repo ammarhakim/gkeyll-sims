@@ -554,7 +554,6 @@ function writeFields(frameNum, tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
    phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
-   vParaSquaredCalc:write( string.format("vParaSquared_%d.h5", frameNum), tCurr)
 end
 
 -- dynvector for total particle count
