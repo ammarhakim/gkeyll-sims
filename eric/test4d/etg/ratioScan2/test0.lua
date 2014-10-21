@@ -16,7 +16,7 @@ tFrame = (tEnd-tStart)/nFrames -- time between frames
 -- physical parameters
 eV            = Lucee.ElementaryCharge
 kineticCharge = -Lucee.ElementaryCharge
-ionCharge     = Lucee.ElementaryCharge
+adiabaticCharge = Lucee.ElementaryCharge
 kineticMass   = Lucee.ElectronMass
 adiabaticMass = 2.014*Lucee.ProtonMass -- (deuterium ions)
 kineticTemp   = 2072 -- [eV]
@@ -129,7 +129,7 @@ function bFieldProfile(x)
 end
 
 function kineticTempProfile(x)
-  return kineticTemp*(1 + (x-R)/L_T)
+  return kineticTemp*(1 - (x-R)/L_T)
 end
 
 function perturbDensityProfile(x,y)
@@ -351,6 +351,7 @@ phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   basis = basis_2d,
   kzfTimesRhoSquared = 1,
   adiabaticTemp = adiabaticTemp,
+  adiabaticCharge = adiabaticCharge,
 }
 -- Updater to smooth out 2d field
 smoothCalc = Updater.SimpleSmoothToC02D {
