@@ -145,7 +145,7 @@ end
 function perturbDensityProfile(x,y)
   local x0 = (X_LOWER+X_UPPER)/2
   local sigma = deltaR/4
-  return n0*1e-4*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
+  return n0*1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)--*math.exp(-(x-x0)^2/(2*sigma^2))
 end
 
 function fProfile(x,y,v,mu)

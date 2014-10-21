@@ -1,7 +1,6 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
--- NEW INITIALIZATION
--- Testing field arithmetic init
+-- Same as test0, but without updateDirs specified
 
 --decomp4d = DecompRegionCalc4D.CartProd {cuts = {1,1,1,1}}
 --decomp2d = DecompRegionCalc2D.CartProd {cuts = {1,1}}
@@ -14,7 +13,6 @@ cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
 tEnd = 3e-7
---tEnd = 6.60129e-09
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 1
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -125,7 +123,7 @@ f1 = f:duplicate()
 -- updated solution
 fNew = f:duplicate()
 -- for use in time-stepping
-fNewDup = f:duplicate()
+fNewDup = fNew:duplicate()
 -- to store background distfElc
 fBackground = f:duplicate()
 fFluctuating = DataStruct.Field4D {
@@ -144,9 +142,7 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y)
-  local x0 = (X_LOWER+X_UPPER)/2
-  local sigma = deltaR/4
-  return 1e-4*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
+  return n0*1e-4*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
 end
 
 function fProfile(x,y,v,mu)
@@ -174,7 +170,7 @@ initKineticFPerturb = Updater.EvalOnNodes4D {
    shareCommonNodes = false,
    -- function to use for initialization
    evaluate = function (x,y,v,mu,t)
-		 return 1+perturbDensityProfile(x,y)
+		 return perturbDensityProfile(x,y)*fProfile(x,y,v,mu)
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
@@ -260,7 +256,6 @@ pbSlvr = Updater.PoissonBracket4D {
    equation = gyroEqn,
    -- let solver know about additional jacobian factor
    jacobianField = jacobianField,
-   updateDirections = {0,1,2},
 }
 
 -- Hamiltonian
@@ -295,6 +290,7 @@ numDensityKinetic = DataStruct.Field2D {
    ghost = {1, 1},
 }
 numDensityAdiabatic = numDensityKinetic:duplicate()
+numDensityDelta = numDensityKinetic:duplicate()
 -- to compute number density
 numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- 4D phase-space grid 
@@ -305,6 +301,14 @@ numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    basis2d = basis_2d,
    -- desired moment (0, 1 or 2)
    moment = 0,
+}
+
+-- dynvector for total particle count
+totalPtcl = DataStruct.DynVector { numComponents = 1, }
+-- to compute total number of particles in domain
+totalPtclCalc = Updater.IntegrateGeneralField2D {
+   onGrid = grid_2d,
+   basis = basis_2d,
 }
 
 -- to store the electrostatic potential on spatial grid
@@ -413,34 +417,6 @@ fieldEnergyCalc = Updater.IntegrateGeneralField2D {
    onGrid = grid_2d,
    basis = basis_2d,
    moment = 2,
-}
-
--- to scale distribution function
-scaleInitDistF = Updater.ETGInitializeDensity {
-  -- 4D phase-space grid 
-   onGrid = grid_4d,
-   -- 4D phase-space basis functions
-   basis4d = basis_4d,
-   -- 2D spatial basis functions
-   basis2d = basis_2d,
-   -- Desired constant density
-   constantDensity = n0,
-   polyOrder = polyOrder,
-}
--- dynvector for total particle count
-totalPtcl = DataStruct.DynVector { numComponents = 1, }
--- to compute total number of particles in domain
-totalPtclCalc = Updater.IntegrateGeneralField2D {
-   onGrid = grid_2d,
-   basis = basis_2d,
-}
-
-multiply4dCalc = Updater.FieldArithmeticUpdater4D {
-  onGrid = grid_4d,
-  basis = basis_4d,
-  evaluate = function(fld1, fld2)
-    return fld1*fld2
-  end
 }
 
 function calcNumDensity(fIn, nOut)
@@ -569,15 +545,22 @@ function writeFields(frameNum, tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
+   --numDensityDelta:copy(numDensityKinetic)
+   --numDensityDelta:accumulate(-1, numDensityAdiabatic)
    --numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
 end
 
+applyBcToBackgroundDistF(f)
+
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
--- Scale distribution function and apply bcs
-runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
-applyBcToBackgroundDistF(f)
--- Recalculate density
+-- Compute total number of particles
+runUpdater(totalPtclCalc, 0.0, 0.0, {numDensityKinetic}, {totalPtcl})
+-- Compute fraction to multiply distribution function by to get desired density
+scaleFactor = deltaR*deltaR*n0/totalPtcl:lastInsertedData()
+-- Scale fields and recalculate density
+f:scale(scaleFactor)
+Lucee.logInfo (string.format("-- Scaling distribution function by  %f", scaleFactor))
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
 numDensityAdiabatic:copy(numDensityKinetic)
@@ -593,12 +576,8 @@ phi2dBackground:copy(phi2dSmoothed)
 -- Store background f
 fBackground:copy(f)
 
-runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
---runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {fInitialPerturb})
---applyBcToFluctuatingDistF(fInitialPerturb)
--- Add perturbation to f
-f:copy(fNew)
---f:accumulate(1.0, fInitialPerturb)
+-- Scale f perturbation and add to f
+f:accumulate(scaleFactor, fInitialPerturb)
 -- Apply boundary conditions
 applyBcToTotalDistF(f)
 -- Compute potential

@@ -1,10 +1,5 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
--- NEW INITIALIZATION
--- Testing field arithmetic init
-
---decomp4d = DecompRegionCalc4D.CartProd {cuts = {1,1,1,1}}
---decomp2d = DecompRegionCalc2D.CartProd {cuts = {1,1}}
 
 -- polynomial order
 polyOrder = 1
@@ -13,8 +8,7 @@ polyOrder = 1
 cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 3e-7
---tEnd = 6.60129e-09
+tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 1
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -38,7 +32,7 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/10
+L_T       = R/20
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
@@ -79,12 +73,6 @@ grid_fluct_4d = Grid.RectCart4D {
    cells = {N_X, N_Y, N_VPARA, N_MU},
    periodicDirs = {0, 1},
 }
-grid_back_4d = Grid.RectCart4D {
-   lower = {X_LOWER, Y_LOWER, VPARA_LOWER, MU_LOWER},
-   upper = {X_UPPER, Y_UPPER, VPARA_UPPER, MU_UPPER},
-   cells = {N_X, N_Y, N_VPARA, N_MU},
-   periodicDirs = {1},
-}
 -- 2d spatial grid
 grid_2d = Grid.RectCart2D {
    lower = {X_LOWER, Y_LOWER},
@@ -116,7 +104,7 @@ basis_2d = NodalFiniteElement2D.SerendipityElement {
 
 -- distribution function for electrons
 f = DataStruct.Field4D {
-   onGrid = grid_back_4d,
+   onGrid = grid_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
@@ -134,6 +122,7 @@ fFluctuating = DataStruct.Field4D {
    ghost = {1, 1},
 }
 fInitialPerturb = fFluctuating:duplicate()
+fForcedGradient = fFluctuating:duplicate()
 
 function bFieldProfile(x)
   return B0*R/x
@@ -144,9 +133,13 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y)
-  local x0 = (X_LOWER+X_UPPER)/2
-  local sigma = deltaR/4
-  return 1e-4*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
+  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+end
+
+function forcedDensityProfile(x,y)
+  local epsN = 4.842871035686017e-03
+  local x0 = (X_LOWER + X_UPPER)/2
+  return epsN*(x-x0)/(deltaR/2)
 end
 
 function fProfile(x,y,v,mu)
@@ -157,7 +150,7 @@ end
 
 -- initialize electron distribution function
 initKineticF = Updater.EvalOnNodes4D {
-   onGrid = grid_back_4d,
+   onGrid = grid_4d,
    basis = basis_4d,
    shareCommonNodes = false,
    -- function to use for initialization
@@ -167,17 +160,29 @@ initKineticF = Updater.EvalOnNodes4D {
 }
 runUpdater(initKineticF, 0.0, 0.0, {}, {f})
 
--- initialize electron distribution function
+-- initialize perturbation to electron distribution function
 initKineticFPerturb = Updater.EvalOnNodes4D {
    onGrid = grid_fluct_4d,
    basis = basis_4d,
    shareCommonNodes = false,
    -- function to use for initialization
    evaluate = function (x,y,v,mu,t)
-		 return 1+perturbDensityProfile(x,y)
+		 return 1 + perturbDensityProfile(x,y)
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
+
+-- initialize forced gradient for electron distribution function
+initKineticFGradient = Updater.EvalOnNodes4D {
+   onGrid = grid_fluct_4d,
+   basis = basis_4d,
+   shareCommonNodes = false,
+   -- function to use for initialization
+   evaluate = function (x,y,v,mu,t)
+		 return 1 + forcedDensityProfile(x,y)
+	 end
+}
+runUpdater(initKineticFGradient, 0.0, 0.0, {}, {fForcedGradient})
 
 -- Magnetic Field (2D)
 bField2d = DataStruct.Field2D {
@@ -261,6 +266,7 @@ pbSlvr = Updater.PoissonBracket4D {
    -- let solver know about additional jacobian factor
    jacobianField = jacobianField,
    updateDirections = {0,1,2},
+   zeroFluxDirections = {2,3},
 }
 
 -- Hamiltonian
@@ -339,10 +345,25 @@ phi4d = DataStruct.Field4D {
   ghost = {1, 1},
 }
 
+-- Updater to compute potential
+phiCalc = Updater.ETGAdiabaticPotentialUpdater {
+  onGrid = grid_2d,
+  basis = basis_2d,
+  kzfTimesRhoSquared = 1,
+  adiabaticTemp = adiabaticTemp,
+}
 -- Updater to smooth out 2d field
 smoothCalc = Updater.SimpleSmoothToC02D {
    onGrid = grid_back_2d,
    basis = basis_2d,
+}
+
+multiply4dCalc = Updater.FieldArithmeticUpdater4D {
+  onGrid = grid_4d,
+  basis = basis_4d,
+  evaluate = function(fld1, fld2)
+    return fld1*fld2
+  end
 }
 
 function applyBcToTotalPotential(fld)
@@ -367,35 +388,14 @@ function applyBcToTotalDistF(fld)
   fFluctuating:copy(fld)
   fFluctuating:accumulate(-1.0, fBackground)
   fld:accumulate(-1.0, fFluctuating)
-  -- Apply boundary conditions to fluctuating component
-  applyBcToFluctuatingDistF(fFluctuating)
+  -- Apply periodic boundary conditions to fluctuating component
+  fFluctuating:sync()
   -- Add back to total field
   fld:accumulate(1.0, fFluctuating)
 end
 
-function applyBcToFluctuatingDistF(fld)
-  fld:applyCopyBc(2, "lower")
-  fld:applyCopyBc(2, "upper")
-  fld:applyCopyBc(3, "lower")
-  fld:applyCopyBc(3, "upper")
-  fld:sync()
-end
-
-function applyBcToBackgroundDistF(fld)
-  fld:applyCopyBc(0, "lower")
-  fld:applyCopyBc(0, "upper")
-  fld:applyCopyBc(2, "lower")
-  fld:applyCopyBc(2, "upper")
-  fld:applyCopyBc(3, "lower")
-  fld:applyCopyBc(3, "upper")
-  fld:sync()
-end
-
-function calcPotential(kineticN, adiabaticN, nAtCenter, phiOut)
-  phiOut:copy(kineticN)
-  phiOut:accumulate(-1.0, adiabaticN)
-  nAtCenter = nAtCenter
-  phiOut:scale(adiabaticTemp/nAtCenter)
+function calcPotential(kineticN, adiabaticN, phiOut)
+  runUpdater(phiCalc, 0.0, 0.0, {kineticN, adiabaticN}, {phiOut})
 end
 
 function calcHamiltonian(hamilKeIn, phi2dIn, hamilOut)
@@ -427,21 +427,6 @@ scaleInitDistF = Updater.ETGInitializeDensity {
    constantDensity = n0,
    polyOrder = polyOrder,
 }
--- dynvector for total particle count
-totalPtcl = DataStruct.DynVector { numComponents = 1, }
--- to compute total number of particles in domain
-totalPtclCalc = Updater.IntegrateGeneralField2D {
-   onGrid = grid_2d,
-   basis = basis_2d,
-}
-
-multiply4dCalc = Updater.FieldArithmeticUpdater4D {
-  onGrid = grid_4d,
-  basis = basis_4d,
-  evaluate = function(fld1, fld2)
-    return fld1*fld2
-  end
-}
 
 function calcNumDensity(fIn, nOut)
   runUpdater(numDensityCalc, 0.0, 0.0, {fIn, bField2d}, {nOut})
@@ -465,7 +450,7 @@ function rk3(tCurr, myDt)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
   -- compute potential
-  calcPotential(numDensityKinetic, numDensityAdiabatic, n0, phi2d)
+  calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
   -- Apply boundary conditions
   applyBcToTotalPotential(phi2d)
   -- smooth potential
@@ -486,7 +471,7 @@ function rk3(tCurr, myDt)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
   -- compute potential
-  calcPotential(numDensityKinetic, numDensityAdiabatic, n0, phi2d)
+  calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
   -- Apply boundary conditions
   applyBcToTotalPotential(phi2d)
   -- smooth potential
@@ -507,7 +492,7 @@ function rk3(tCurr, myDt)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
   -- compute potential
-  calcPotential(numDensityKinetic, numDensityAdiabatic, n0, phi2d)
+  calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
   -- Apply boundary conditions
   applyBcToTotalPotential(phi2d)
   -- smooth potential
@@ -568,21 +553,29 @@ function writeFields(frameNum, tCurr)
    numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
-   --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
-   --numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
+   phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
 
+-- dynvector for total particle count
+totalPtcl = DataStruct.DynVector { numComponents = 1, }
+-- to compute total number of particles in domain
+totalPtclCalc = Updater.IntegrateGeneralField2D {
+   onGrid = grid_2d,
+   basis = basis_2d,
+}
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
-applyBcToBackgroundDistF(f)
--- Recalculate density
+-- Add forced gradient to f
+runUpdater(multiply4dCalc, 0.0, 0.0, {f, fForcedGradient}, {fNew})
+f:copy(fNew)
+-- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
 numDensityAdiabatic:copy(numDensityKinetic)
 -- Compute background phi
-calcPotential(numDensityKinetic, numDensityAdiabatic, n0, phi2d)
+calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
 -- Apply bouncary conditions
 applyBcToBackgroundPotential(phi2d)
 -- smooth potential
@@ -590,20 +583,19 @@ runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
 
 -- Store background phi
 phi2dBackground:copy(phi2dSmoothed)
+applyBcToBackgroundPotential(phi2dBackground)
+
 -- Store background f
 fBackground:copy(f)
 
-runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
---runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {fInitialPerturb})
---applyBcToFluctuatingDistF(fInitialPerturb)
 -- Add perturbation to f
+runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
 f:copy(fNew)
---f:accumulate(1.0, fInitialPerturb)
 -- Apply boundary conditions
 applyBcToTotalDistF(f)
--- Compute potential
+-- Compute potential with perturbation added
 calcNumDensity(f, numDensityKinetic)
-calcPotential(numDensityKinetic, numDensityAdiabatic, n0, phi2d)
+calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
 applyBcToTotalPotential(phi2d)
 runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
 phi2dSmoothed:sync()
