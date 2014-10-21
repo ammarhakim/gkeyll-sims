@@ -8,9 +8,9 @@ polyOrder = 1
 cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-6
+tEnd = 3e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 1
+nFrames = 3
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -129,7 +129,7 @@ function bFieldProfile(x)
 end
 
 function kineticTempProfile(x)
-  return kineticTemp*(1 - (x-R)/L_T)
+  return kineticTemp*(1 + (x-R)/L_T)
 end
 
 function perturbDensityProfile(x,y)
@@ -568,8 +568,8 @@ calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
 -- Add forced gradient to f
-runUpdater(multiply4dCalc, 0.0, 0.0, {f, fForcedGradient}, {fNew})
-f:copy(fNew)
+--runUpdater(multiply4dCalc, 0.0, 0.0, {f, fForcedGradient}, {fNew})
+--f:copy(fNew)
 -- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
