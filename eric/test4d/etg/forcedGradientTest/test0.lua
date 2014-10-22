@@ -8,9 +8,9 @@ polyOrder = 1
 cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 3e-6
+tEnd = 1e-9
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 3
+nFrames = 1
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -32,7 +32,7 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/20
+L_T       = R/10
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
@@ -454,8 +454,8 @@ function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi2dSmoothed}, {fieldEnergy})
 
   -- Calc vParaSquared
-  runUpdater(vParaSquaredCalc, curr, dt, {f, bField2d}, {vParaSquaredKinetic})
-  vParaSquaredKinetic:scale(2*math.pi/kineticMass)
+  --runUpdater(vParaSquaredCalc, curr, dt, {f, bField2d}, {vParaSquaredKinetic})
+  --vParaSquaredKinetic:scale(2*math.pi/kineticMass)
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -575,16 +575,9 @@ function writeFields(frameNum, tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
    phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
-   vParaSquaredCalc:write( string.format("vParaSquared_%d.h5", frameNum), tCurr)
+   --vParaSquaredKinetic:write( string.format("vParaSquared_%d.h5", frameNum), tCurr)
 end
 
--- dynvector for total particle count
-totalPtcl = DataStruct.DynVector { numComponents = 1, }
--- to compute total number of particles in domain
-totalPtclCalc = Updater.IntegrateGeneralField2D {
-   onGrid = grid_2d,
-   basis = basis_2d,
-}
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
@@ -626,6 +619,8 @@ calcHamiltonian(hamilKE, phi2dSmoothed, hamil)
 -- Compute diagnostics for t = 0
 calcDiagnostics(0.0, 0.0)
 writeFields(0,0)
+
+runUpdater(vParaSquaredCalc, 0, 0, {f, bField2d}, {vParaSquaredKinetic})
 
 tCurr = tStart
 fNew:copy(f)
