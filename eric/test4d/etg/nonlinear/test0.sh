@@ -1,6 +1,6 @@
 #!/bin/bash 
 
-#PBS -N gke-kinetic-test0
+#PBS -N gke-test0
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
