@@ -1,5 +1,6 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
+-- ZF TERM ADDED
 
 -- polynomial order
 polyOrder = 1
@@ -8,9 +9,9 @@ polyOrder = 1
 cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1.5e-6
+tEnd = 2e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 3
+nFrames = 4
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
