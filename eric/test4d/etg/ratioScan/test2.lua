@@ -8,7 +8,7 @@ polyOrder = 1
 cfl = 0.1
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1.0e-6
+tEnd = 2e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 2
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -32,12 +32,12 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/20
+L_T       = R/5
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
 N_Y = 8
-N_VPARA = 8
+N_VPARA = 16
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
