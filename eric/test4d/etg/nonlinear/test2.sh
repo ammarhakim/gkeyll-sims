@@ -1,6 +1,5 @@
 #!/bin/bash 
-
-#PBS -N gke-test2-nonlinear
+#PBS -N nonlinear-test2
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
