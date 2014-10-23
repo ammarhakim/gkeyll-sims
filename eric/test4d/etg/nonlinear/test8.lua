@@ -1,6 +1,6 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
--- NO ZF TERM, LONG SIM
+-- NO ZF TERM, LONG SIM, EVEN LONGER THAN TEST7
 
 -- polynomial order
 polyOrder = 1
@@ -9,9 +9,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 6e-6
+tEnd = 10e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 12
+nFrames = 20
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
