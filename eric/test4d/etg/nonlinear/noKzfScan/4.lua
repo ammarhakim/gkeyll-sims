@@ -11,7 +11,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 20e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 40
+nFrames = 80
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
