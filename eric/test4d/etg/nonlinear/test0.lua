@@ -1,6 +1,6 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
--- NO ZF TERM
+-- NO ZF TERM, LOW RES
 
 -- polynomial order
 polyOrder = 1
