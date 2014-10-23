@@ -1,6 +1,6 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
--- ZF TERM ADDED, KZFSQ = 0.4
+-- ZF TERM ADDED, KZFSQ = 0.7
 
 -- polynomial order
 polyOrder = 1
@@ -310,7 +310,7 @@ phi4d = DataStruct.Field4D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   onGrid = grid_2d,
   basis = basis_2d,
-  kzfTimesRhoSquared = 0.4,
+  kzfTimesRhoSquared = 0.7,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
 }
