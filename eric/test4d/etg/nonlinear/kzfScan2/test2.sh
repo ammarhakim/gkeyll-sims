@@ -1,5 +1,5 @@
 #!/bin/bash 
-#PBS -N kzf-2
+#PBS -N kzf2-2
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
