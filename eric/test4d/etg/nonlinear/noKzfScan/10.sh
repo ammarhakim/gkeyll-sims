@@ -1,5 +1,5 @@
 #!/bin/bash 
-#PBS -N nonlinear-test8
+#PBS -N nokzf-10
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
@@ -10,7 +10,7 @@
 #PBS -V 
 #PBS -j oe 
  
-CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i test8.lua -pc_type lu" 
+CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i 10.lua -pc_type lu" 
 cd $PBS_O_WORKDIR 
 $CMD 
 exit
