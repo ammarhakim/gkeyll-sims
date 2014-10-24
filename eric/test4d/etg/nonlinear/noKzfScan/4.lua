@@ -9,7 +9,7 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 50e-6
+tEnd = 45e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 100
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -273,6 +273,7 @@ numDensityKinetic = DataStruct.Field2D {
    ghost = {1, 1},
 }
 numDensityAdiabatic = numDensityKinetic:duplicate()
+numDensityDelta = numDensityKinetic:duplicate()
 -- to compute number density
 numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- 4D phase-space grid 
@@ -393,6 +394,9 @@ end
 
 function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi2dSmoothed}, {fieldEnergy})
+  -- Calc perturbed density
+  numDensityDelta:copy(numDensityKinetic)
+  numDensityDelta:accumulate(-1.0, numDensityAdiabatic)
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -511,6 +515,7 @@ function writeFields(frameNum, tCurr)
    numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
+   numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
 
