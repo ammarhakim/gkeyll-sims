@@ -282,6 +282,23 @@ numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    moment = 0,
 }
 
+-- For temp calc
+vParaSquaredKinetic = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+vParaSquaredCalc = Updater.DistFuncMomentCalcWeighted2D {
+   -- 4D phase-space grid 
+   onGrid = grid_4d,
+   -- 4D phase-space basis functions
+   basis4d = basis_4d,
+   -- 2D spatial basis functions
+   basis2d = basis_2d,
+   -- desired moment (0, 1 or 2)
+   moment = 2,
+}
+
 -- to store the electrostatic potential on spatial grid
 phi2d = DataStruct.Field2D {
    onGrid = grid_2d,
@@ -390,6 +407,10 @@ end
 
 function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi2dSmoothed}, {fieldEnergy})
+
+  -- For use in determining temp
+  runUpdater(vParaSquaredCalc, curr, dt, {f, bField2d}, {vParaSquaredKinetic})
+  vParaSquaredKinetic:scale(2*math.pi/kineticMass)
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -508,6 +529,7 @@ function writeFields(frameNum, tCurr)
    numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
+   vParaSquaredKinetic:write( string.format("vParaSq_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
 
