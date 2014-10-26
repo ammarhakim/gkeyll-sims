@@ -1,0 +1,2 @@
+This directory contains tests for doing convergence studies at a particular R/L_T value (20 here).
+Velocity space resolution and bounds are varied.
