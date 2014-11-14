@@ -300,7 +300,7 @@ end
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = Tperiod
+tEnd = 2*Tperiod
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 40
 tFrame = (tEnd-tStart)/nFrames -- time between frames
