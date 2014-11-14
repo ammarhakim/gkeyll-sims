@@ -27,14 +27,16 @@ a  = 0.4701 -- [m]
 n0 = 4.992*10^(19) -- [1/m^3]
 q = 8
 -- derived parameters
-R         = R0 + 0.5*a
-vtKinetic = math.sqrt(kineticTemp*eV/kineticMass)
-c_s       = math.sqrt(kineticTemp*eV/kineticMass)
-omega_s   = math.abs(kineticCharge*B0/kineticMass)
-rho_s     = c_s/omega_s
-deltaR    = 32*rho_s
-L_T       = R/4
-ky_min    = 2*math.pi/deltaR
+R          = R0 + 0.5*a
+L_parallel = 2*math.pi*R*q
+vtKinetic  = math.sqrt(kineticTemp*eV/kineticMass)
+c_s        = math.sqrt(kineticTemp*eV/kineticMass)
+omega_s    = math.abs(kineticCharge*B0/kineticMass)
+rho_s      = c_s/omega_s
+deltaR     = 32*rho_s
+L_T        = R/6
+ky_min     = 2*math.pi/deltaR
+kz_min     = 2*math.pi/L_parallel
 -- grid parameters: number of cells
 N_X = 8
 N_Y = 8
@@ -47,7 +49,7 @@ X_UPPER = R + deltaR
 Y_LOWER = -deltaR/2
 Y_UPPER = deltaR/2
 Z_LOWER = 0
-Z_UPPER = 2*math.pi*R*q
+Z_UPPER = L_parallel
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
@@ -128,17 +130,17 @@ function kineticTempProfile(x)
   return kineticTemp*(1 - (x-R)/L_T)
 end
 
-function perturbDensityProfile(x,y)
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+function perturbDensityProfile(x,y,z)
+  local x0 = (X_LOWER+X_UPPER)/2
+  local sigma = deltaR/4
+  return 1e-2*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*
+    math.exp(-(x-x0)^2/(2*sigma^2))*(1 + math.cos(kz_min*z))
 end
 
 function fProfile(x,y,z,v,mu)
-  --return (2*math.pi*kineticTempProfile(x)*eV/kineticMass)^(-3/2)*
-  --  math.exp(-kineticMass*v^2/(2*kineticTempProfile(x)*eV))*
-  --  math.exp(-math.abs(mu)*bFieldProfile(x)/(kineticTempProfile(x)*eV))
-  local x0 = (X_LOWER+X_UPPER)/2
-  local sigma = deltaR/4
-  return (vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
+  return (2*math.pi*kineticTempProfile(x)*eV/kineticMass)^(-3/2)*
+    math.exp(-kineticMass*v^2/(2*kineticTempProfile(x)*eV))*
+    math.exp(-math.abs(mu)*bFieldProfile(x)/(kineticTempProfile(x)*eV))
 end
 
 -- initialize electron distribution function
@@ -161,7 +163,7 @@ initKineticFPerturb = Updater.EvalOnNodes5D {
    shareCommonNodes = false,
    -- function to use for initialization
    evaluate = function (x,y,z,v,mu,t)
-		 return 1 + perturbDensityProfile(x,y)
+		 return 1 + perturbDensityProfile(x,y,z)
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
