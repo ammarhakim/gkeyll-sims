@@ -1,12 +1,12 @@
 -- Input file for SOL problem with kinetic ions and electrons
--- Not sure what the math.pi's are all about, but this file was used for paper figure
+-- Used to plot moment at edge before BC is applied...
 -- Modified so that ghost cells are all = {2, 2}
 
 -- polynomial order
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.1
+cfl = 0.0001
 
 -- physical constants
 -- eletron mass (kg)
@@ -69,8 +69,8 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 350e-6
-nFrames = 5
+tEnd = 1.6e-6
+nFrames = 1
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -672,6 +672,9 @@ end
 -- Dynvectors to store 0-3rd moments at left and right edges
 momentsAtEdgesElc = DataStruct.DynVector { numComponents = 8, }
 momentsAtEdgesIon = DataStruct.DynVector { numComponents = 8, }
+-- Dynvectors to store 0-3rd moments at left and right edges BEFORE APPLYBC
+momentsAtEdgesElcBeforeBc = DataStruct.DynVector { numComponents = 8, }
+momentsAtEdgesIonBeforeBc = DataStruct.DynVector { numComponents = 8, }
 
 momentsAtEdgesElcCalc = Updater.ElectromagneticMomentsAtEdgesUpdater {
   onGrid = gridElc,
@@ -1039,7 +1042,7 @@ function rk3(tCurr, myDt)
    
    runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon}, {phi1d})
 
-   -- Compute Hamiltonian
+   -- Compute HamiltonianmomentsAtEdgesElcBeforeBc
    calcHamiltonianElc(tCurr, myDt, phi1d, aParallel1d, aSquared1d, hamilKeElc, hamilElc)
    calcHamiltonianIon(tCurr, myDt, phi1d, aParallel1d, aSquared1d, hamilKeIon, hamilIon)
 
@@ -1057,6 +1060,8 @@ function rk3(tCurr, myDt)
    distf1Ion:combine(1.0/3.0, distfIon, 2.0/3.0, distfNewIon)
    
    calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
+   runUpdater(momentsAtEdgesElcCalc, tCurr, myDt, {distf1Elc, hamilKeElcDg, aParallel1dDg}, {momentsAtEdgesElcBeforeBc})
+   runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distf1Ion, hamilKeIonDg, aParallel1dDg}, {momentsAtEdgesIonBeforeBc})
    applyBc(tCurr, myDt, distf1Elc, distf1Ion, aParallel1dDg, cutoffVelocities)
 
    distfElc:copy(distf1Elc)
@@ -1134,6 +1139,8 @@ function writeFields(frameNum, tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
+   momentsAtEdgesElcBeforeBc:write( string.format("momentsAtEdgesElcBeforeBc_%d.h5", frameNum), tCurr)
+   momentsAtEdgesIonBeforeBc:write( string.format("momentsAtEdgesIonBeforeBc_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
