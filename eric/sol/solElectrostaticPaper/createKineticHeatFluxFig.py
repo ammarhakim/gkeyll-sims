@@ -16,8 +16,8 @@ rc('font', **font)
 
 filenumEnd = 1
 
-pathBase = '/Users/eshi/Research/gkeyllall/gkeyll-sims/eric/sol/solElectrostaticPaper/'
-fileBase = 'es3_'
+pathBase = '/Users/eshi/Research/gkeyllall/gkeyll-sims/eric/sol/solElectrostaticPaper/decDebug/'
+fileBase = 'es1_'
 dataname = 'heatFluxAtEdge'
 
 # Make a plot
@@ -31,12 +31,12 @@ for idx in range(1,filenumEnd+1):
   timeVals = fh.root.DataStruct.timeMesh.read()*1e6
   dataVals = fh.root.DataStruct.data.read()
 
-  plt.plot(timeVals, dataVals[:,0],'b.')
-  plt.plot(timeVals, dataVals[:,1],'r.')
-  plt.plot(timeVals, dataVals[:,2],'k.')
+  plt.semilogx(timeVals, dataVals[:,0],'b')
+  plt.semilogx(timeVals, dataVals[:,1],'r')
+  plt.semilogx(timeVals, dataVals[:,2],'k')
 
-plt.ylim(0, 1e9)
-plt.xlim(1.4, 1.45)
+plt.ylim(0, 6e9)
+plt.xlim(1, 2)
 plt.legend(['Total','Ions','Electrons'],loc='upper left')
 plt.xlabel(r'time ($\mu$s)')
 plt.ylabel(r'Q (W/m$^2$)')
@@ -45,5 +45,5 @@ plt.grid()
 #ax.set_xscale('log', basex=10, subsx=np.arange(2,9,1))
 #ax.xaxis.grid(True, which='both')
 
-plt.savefig('kinetic-elc-heat-flux3.pdf', bbox_inches='tight')
+plt.savefig('kinetic-elc-heat-flux4.pdf', bbox_inches='tight')
 plt.show()
