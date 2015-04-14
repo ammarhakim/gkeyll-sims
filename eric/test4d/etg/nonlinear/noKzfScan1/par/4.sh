@@ -9,8 +9,9 @@
 #PBS -r n
 #PBS -V 
 #PBS -j oe 
- 
-CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i 4.lua -pc_type lu" 
+NPROCS=`wc -l < $PBS_NODEFILE`
+
+CMD="/p/gke/eshi/gkeyllall/par-opt/gkeyll/gkeyll -i 4.lua -pc_type lu" 
 cd $PBS_O_WORKDIR 
-$CMD 
+mpiexec -np $NPROCS $CMD 
 exit

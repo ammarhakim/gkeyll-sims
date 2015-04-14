@@ -1,8 +1,9 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
+-- 4-15-2015: input file to test parallelization
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 1, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -16,9 +17,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 15e-6
+tEnd = 10e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 300
+nFrames = 100
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -40,7 +41,7 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/4
+L_T       = R/20
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 16
@@ -127,7 +128,11 @@ fFluctuating = DataStruct.Field4D {
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
-fInitialPerturb = fFluctuating:duplicate()
+fInitialPerturb = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 
 function bFieldProfile(x)
   return B0*R/x
@@ -313,7 +318,11 @@ phi2d = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-phi2dSmoothed = phi2d:duplicate()
+phi2dSmoothed = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 -- to store electrostatic potential for addition to hamiltonian
 phi4d = DataStruct.Field4D {
   onGrid = grid_4d,
@@ -325,7 +334,7 @@ phi4d = DataStruct.Field4D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   onGrid = grid_2d,
   basis = basis_2d,
-  kzfTimesRhoSquared = 1,
+  kzfTimesRhoSquared = n0,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
 }
@@ -520,7 +529,6 @@ function writeFields(frameNum, tCurr)
    numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
-
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs

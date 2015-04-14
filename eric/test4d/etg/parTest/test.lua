@@ -3,7 +3,7 @@
 -- 4-15-2015: input file to test parallelization
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 1, 2, 2} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 2, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -128,7 +128,11 @@ fFluctuating = DataStruct.Field4D {
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
-fInitialPerturb = fFluctuating:duplicate()
+fInitialPerturb = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 
 function bFieldProfile(x)
   return B0*R/x
@@ -309,7 +313,11 @@ phi2d = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-phi2dSmoothed = phi2d:duplicate()
+phi2dSmoothed = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 -- to store electrostatic potential for addition to hamiltonian
 phi4d = DataStruct.Field4D {
   onGrid = grid_4d,
@@ -321,7 +329,7 @@ phi4d = DataStruct.Field4D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   onGrid = grid_2d,
   basis = basis_2d,
-  kzfTimesRhoSquared = 1,
+  kzfTimesRhoSquared = n0,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
 }
@@ -510,13 +518,12 @@ end
 
 -- write data to H5 file
 function writeFields(frameNum, tCurr)
-   numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
+   --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
-   phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
+   --phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
    numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
-
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
