@@ -334,7 +334,7 @@ phi4d = DataStruct.Field4D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   onGrid = grid_2d,
   basis = basis_2d,
-  kzfTimesRhoSquared = n0,
+  n0 = n0,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
 }
