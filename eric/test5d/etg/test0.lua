@@ -1,6 +1,14 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 
+-- phase-space decomposition
+phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 1, 1, 1, 1} }
+-- configuration space decomposition
+confDecomp = DecompRegionCalc3D.SubCartProd5D {
+   decomposition = phaseDecomp,
+   collectDirections = {0, 1, 2},
+}
+
 -- polynomial order
 polyOrder = 1
 
@@ -8,7 +16,7 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 40e-6
+tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 100
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -34,7 +42,7 @@ c_s        = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s    = math.abs(kineticCharge*B0/kineticMass)
 rho_s      = c_s/omega_s
 deltaR     = 32*rho_s
-L_T        = R/6
+L_T        = R/20
 ky_min     = 2*math.pi/deltaR
 kz_min     = 2*math.pi/L_parallel
 -- grid parameters: number of cells
@@ -67,19 +75,20 @@ function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
    return updater:advance(currTime+timeStep)
 end
 
--- GRID NOTES
--- Even though non-fluctuating components are stored on the fluctuating
--- grids (which have periodicity in certain directions), they are never
--- called with sync() which makes this okay.
--- Additionally, grid_back_3d can probably be eliminated since it is 0
--- but I am keeping this in case it is not 0 somehow.
-
 -- full 5d phase space grid
 grid_5d = Grid.RectCart5D {
    lower = {X_LOWER, Y_LOWER, Z_LOWER, VPARA_LOWER, MU_LOWER},
    upper = {X_UPPER, Y_UPPER, Z_UPPER, VPARA_UPPER, MU_UPPER},
    cells = {N_X, N_Y, N_Z, N_VPARA, N_MU},
    periodicDirs = {0, 1, 2},
+   decomposition = phaseDecomp,
+}
+
+grid_back_5d = Grid.RectCart5D {
+   lower = {X_LOWER, Y_LOWER, Z_LOWER, VPARA_LOWER, MU_LOWER},
+   upper = {X_UPPER, Y_UPPER, Z_UPPER, VPARA_UPPER, MU_UPPER},
+   cells = {N_X, N_Y, N_Z, N_VPARA, N_MU},
+   decomposition = phaseDecomp,
 }
 -- 3d spatial grid
 grid_3d = Grid.RectCart3D {
@@ -87,12 +96,13 @@ grid_3d = Grid.RectCart3D {
    upper = {X_UPPER, Y_UPPER, Z_UPPER},
    cells = {N_X, N_Y, N_Z},
    periodicDirs = {0, 1, 2},
+   decomposition = confDecomp,
 }
 grid_back_3d = Grid.RectCart3D {
    lower = {X_LOWER, Y_LOWER, Z_LOWER},
    upper = {X_UPPER, Y_UPPER, Z_UPPER},
    cells = {N_X, N_Y, N_Z},
-   periodicDirs = {1,2},
+   decomposition = confDecomp,
 }
 -- create 5d basis functions
 basis_5d = NodalFiniteElement5D.SerendipityElement {
@@ -107,20 +117,44 @@ basis_3d = NodalFiniteElement3D.SerendipityElement {
 
 -- distribution function for electrons
 f = DataStruct.Field5D {
-   onGrid = grid_5d,
+   onGrid = grid_back_5d,
    numComponents = basis_5d:numNodes(),
    ghost = {1, 1},
 }
 -- for RK time-stepping
-f1 = f:duplicate()
+f1 = DataStruct.Field5D {
+   onGrid = grid_back_5d,
+   numComponents = basis_5d:numNodes(),
+   ghost = {1, 1},
+}
 -- updated solution
-fNew = f:duplicate()
+fNew = DataStruct.Field5D {
+   onGrid = grid_back_5d,
+   numComponents = basis_5d:numNodes(),
+   ghost = {1, 1},
+}
 -- for use in time-stepping
-fNewDup = f:duplicate()
+fDup = DataStruct.Field5D {
+   onGrid = grid_back_5d,
+   numComponents = basis_5d:numNodes(),
+   ghost = {1, 1},
+}
 -- to store background distfElc
-fBackground = f:duplicate()
-fFluctuating = f:duplicate()
-fInitialPerturb = fFluctuating:duplicate()
+fBackground = DataStruct.Field5D {
+   onGrid = grid_back_5d,
+   numComponents = basis_5d:numNodes(),
+   ghost = {1, 1},
+}
+fFluctuating = DataStruct.Field5D {
+   onGrid = grid_5d,
+   numComponents = basis_5d:numNodes(),
+   ghost = {1, 1},
+}
+fInitialPerturb = DataStruct.Field5D {
+   onGrid = grid_5d,
+   numComponents = basis_5d:numNodes(),
+   ghost = {1, 1},
+}
 
 function bFieldProfile(x)
   return B0*R/x
@@ -133,7 +167,7 @@ end
 function perturbDensityProfile(x,y,z)
   local x0 = (X_LOWER+X_UPPER)/2
   local sigma = deltaR/4
-  return 1e-2*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*
+  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*
     math.exp(-(x-x0)^2/(2*sigma^2))*(1 + math.cos(kz_min*z))
 end
 
@@ -145,7 +179,7 @@ end
 
 -- initialize electron distribution function
 initKineticF = Updater.EvalOnNodes5D {
-   onGrid = grid_5d,
+   onGrid = grid_back_5d,
    basis = basis_5d,
    shareCommonNodes = false,
    -- function to use for initialization
@@ -154,6 +188,7 @@ initKineticF = Updater.EvalOnNodes5D {
 	 end
 }
 runUpdater(initKineticF, 0.0, 0.0, {}, {f})
+f:sync()
 
 -- initialize perturbation to electron distribution function
 -- does not contain f_0, instead this will be multiplied with f_0
@@ -167,16 +202,17 @@ initKineticFPerturb = Updater.EvalOnNodes5D {
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
+fInitialPerturb:sync()
 
 -- Magnetic Field (3D)
 bField3d = DataStruct.Field3D {
-   onGrid = grid_3d,
+   onGrid = grid_back_3d,
    numComponents = basis_3d:numNodes(),
    ghost = {1, 1},
 }
 -- Updater to initialize bField3d
 initb = Updater.EvalOnNodes3D {
-  onGrid = grid_3d,
+  onGrid = grid_back_3d,
   basis = basis_3d,
   shareCommonNodes = false,
   evaluate = function (x,y,z,t)
@@ -184,7 +220,7 @@ initb = Updater.EvalOnNodes3D {
   end
 }
 runUpdater(initb, 0.0, 0.0, {}, {bField3d})
-
+bField3d:sync()
 -- to copy phi to a 5d field
 copy3dTo5d = Updater.NodalCopy3DTo5DFieldUpdater {
   -- 5D phase-space grid 
@@ -199,12 +235,12 @@ copy3dTo5d = Updater.NodalCopy3DTo5DFieldUpdater {
 
 -- Jacobian Factor (5D)
 jacobianField = DataStruct.Field5D {
-   onGrid = grid_5d,
+   onGrid = grid_back_5d,
    numComponents = basis_5d:numNodes(),
    ghost = {1, 1},
 }
 initJacobian = Updater.EvalOnNodes5D {
-  onGrid = grid_5d,
+  onGrid = grid_back_5d,
   basis = basis_5d,
   shareCommonNodes = false,
   evaluate = function (x,y,z,vPara,mu,t)
@@ -213,16 +249,17 @@ initJacobian = Updater.EvalOnNodes5D {
 }
 -- Fill out jacobian
 runUpdater(initJacobian, 0.0, 0.0, {}, {jacobianField})
+jacobianField:sync()
 
 -- B_y^* field (5D)
 bStarYField = DataStruct.Field5D {
-   onGrid = grid_5d,
+   onGrid = grid_back_5d,
    numComponents = basis_5d:numNodes(),
    ghost = {1, 1},
 }
 -- Updater to initialize bStarY
 initbStarY = Updater.EvalOnNodes5D {
-  onGrid = grid_5d,
+  onGrid = grid_back_5d,
   basis = basis_5d,
   shareCommonNodes = false,
   evaluate = function (x,y,z,vPara,mu,t)
@@ -230,16 +267,17 @@ initbStarY = Updater.EvalOnNodes5D {
   end
 }
 runUpdater(initbStarY, 0.0, 0.0, {}, {bStarYField})
+bStarYField:sync()
 
 -- B_z^* field (5D)
 bStarZField = DataStruct.Field5D {
-   onGrid = grid_5d,
+   onGrid = grid_back_5d,
    numComponents = basis_5d:numNodes(),
    ghost = {1, 1},
 }
 -- Updater to initialize bStarZ
 initbStarZ = Updater.EvalOnNodes5D {
-  onGrid = grid_5d,
+  onGrid = grid_back_5d,
   basis = basis_5d,
   shareCommonNodes = false,
   evaluate = function (x,y,z,vPara,mu,t)
@@ -247,6 +285,7 @@ initbStarZ = Updater.EvalOnNodes5D {
   end
 }
 runUpdater(initbStarZ, 0.0, 0.0, {}, {bStarZField})
+bStarZField:sync()
 
 -- define equation to solve
 gyroEqn = PoissonBracketEquation.GyroEquation5D {
@@ -271,7 +310,7 @@ pbSlvr = Updater.PoissonBracketOpt5D {
 
 -- Hamiltonian
 hamil = DataStruct.Field5D {
-   onGrid = grid_5d,
+   onGrid = grid_back_5d,
    numComponents = basis_5d:numNodes(),
    ghost = {1, 1},
 }
@@ -289,14 +328,16 @@ initHamilKE = Updater.EvalOnNodes5D {
    end
 }
 runUpdater(initHamilKE, 0.0, 0.0, {}, {hamilKE})
+hamilKE:sync()
 
 -- to store number density
 numDensityKinetic = DataStruct.Field3D {
-   onGrid = grid_3d,
+   onGrid = grid_back_3d,
    numComponents = basis_3d:numNodes(),
    ghost = {1, 1},
 }
 numDensityAdiabatic = numDensityKinetic:duplicate()
+numDensityDelta = numDensityKinetic:duplicate()
 -- to compute number density
 numDensityCalc = Updater.DistFuncMomentCalcWeighted3D {
    -- 5D phase-space grid 
@@ -309,36 +350,17 @@ numDensityCalc = Updater.DistFuncMomentCalcWeighted3D {
    moment = 0,
 }
 
--- For temp calc
-vParaSquaredKinetic = DataStruct.Field3D {
-   onGrid = grid_3d,
-   numComponents = basis_3d:numNodes(),
-   ghost = {1, 1},
-}
-vParaSquaredCalc = Updater.DistFuncMomentCalcWeighted3D {
-   -- 5D phase-space grid 
-   onGrid = grid_5d,
-   -- 5D phase-space basis functions
-   basis5d = basis_5d,
-   -- 3D spatial basis functions
-   basis3d = basis_3d,
-   -- desired moment (0, 1 or 2)
-   moment = 2,
-}
-
--- to store the electrostatic potential on spatial grid
+-- to store the (fluctuating) electrostatic potential on spatial grid
 phi3d = DataStruct.Field3D {
    onGrid = grid_3d,
    numComponents = basis_3d:numNodes(),
    ghost = {1, 1},
 }
-phi3dSmoothed = phi3d:duplicate()
-phi3dBackground = DataStruct.Field3D {
-   onGrid = grid_back_3d,
+phi3dSmoothed = DataStruct.Field3D {
+   onGrid = grid_3d,
    numComponents = basis_3d:numNodes(),
    ghost = {1, 1},
 }
-phi3dFluctuating = phi3d:duplicate()
 -- to store electrostatic potential for addition to hamiltonian
 phi5d = DataStruct.Field5D {
   onGrid = grid_5d,
@@ -350,13 +372,14 @@ phi5d = DataStruct.Field5D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater3D {
   onGrid = grid_3d,
   basis = basis_3d,
+  n0 = n0,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
 }
 
 -- Updater to smooth out 3d field (phi)
 smoothCalc = Updater.SimpleSmoothToC03D {
-   onGrid = grid_back_3d,
+   onGrid = grid_3d,
    basis = basis_3d,
 }
 
@@ -368,23 +391,6 @@ multiply5dCalc = Updater.FieldArithmeticUpdater5D {
   end
 }
 
-function applyBcToTotalPotential(fld)
-  -- Subtract out fluctuating component from phi
-  phi3dFluctuating:copy(fld)
-  phi3dFluctuating:accumulate(-1.0, phi3dBackground)
-  fld:accumulate(-1.0, phi3dFluctuating)
-  -- Apply boundary conditions to fluctuating component
-  phi3dFluctuating:sync()
-  -- Add back to total field
-  fld:accumulate(1.0, phi3dFluctuating)
-end
-
-function applyBcToBackgroundPotential(fld)
-  fld:applyCopyBc(0, "lower")
-  fld:applyCopyBc(0, "upper")
-  fld:sync()
-end
-
 function applyBcToTotalDistF(fld)
   -- Subtract out fluctuating component from f
   fFluctuating:copy(fld)
@@ -394,6 +400,7 @@ function applyBcToTotalDistF(fld)
   fFluctuating:sync()
   -- Add back to total field
   fld:accumulate(1.0, fFluctuating)
+  fld:sync()
 end
 
 function calcHamiltonian(hamilKeIn, phi3dIn, hamilOut)
@@ -401,7 +408,9 @@ function calcHamiltonian(hamilKeIn, phi3dIn, hamilOut)
   hamilOut:copy(hamilKeIn)
   -- copy 3d potential to 5d field
   runUpdater(copy3dTo5d, 0.0, 0.0, {phi3dIn}, {phi5d})
+  phi5d:sync()
   hamilOut:accumulate(kineticCharge, phi5d)
+  hamilOut:sync()
 end
 
 -- dynvector for field energy
@@ -433,10 +442,9 @@ end
 
 function calcDiagnostics(curr, dt)
   runUpdater(fieldEnergyCalc, curr, dt, {phi3dSmoothed}, {fieldEnergy})
-
-  -- For use in determining temp
-  runUpdater(vParaSquaredCalc, curr, dt, {f, bField3d}, {vParaSquaredKinetic})
-  vParaSquaredKinetic:scale(2*math.pi/kineticMass)
+  -- Calc perturbed density
+  numDensityDelta:copy(numDensityKinetic)
+  numDensityDelta:accumulate(-1.0, numDensityAdiabatic)
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -454,7 +462,7 @@ function rk3(tCurr, myDt)
   -- compute potential
   runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
   -- Apply boundary conditions
-  applyBcToTotalPotential(phi3d)
+  phi3d:sync()
   -- smooth potential
   runUpdater(smoothCalc, tCurr, myDt, {phi3d}, {phi3dSmoothed})
   phi3dSmoothed:sync()
@@ -475,7 +483,7 @@ function rk3(tCurr, myDt)
   -- compute potential
   runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
   -- Apply boundary conditions
-  applyBcToTotalPotential(phi3d)
+  phi3d:sync()
   -- smooth potential
   runUpdater(smoothCalc, tCurr, myDt, {phi3d}, {phi3dSmoothed})
   phi3dSmoothed:sync()
@@ -496,7 +504,7 @@ function rk3(tCurr, myDt)
   -- compute potential
   runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
   -- Apply boundary conditions
-  applyBcToTotalPotential(phi3d)
+  phi3d:sync()
   -- smooth potential
   runUpdater(smoothCalc, tCurr, myDt, {phi3d}, {phi3dSmoothed})
   phi3dSmoothed:sync()
@@ -517,7 +525,7 @@ function advanceFrame(tStart, tEnd, initDt)
 
   while tCurr<=tEnd do
     -- Store fields that might need to be reverted
-    fNewDup:copy(fNew)
+    fDup:copy(fNew)
     hamilDup:copy(hamil)
 
     -- if needed adjust dt to hit tEnd exactly
@@ -532,7 +540,7 @@ function advanceFrame(tStart, tEnd, initDt)
       -- time-step too large
       Lucee.logInfo (string.format("** Time step %g too large! Will retake with dt %g", myDt, dtSuggested))
       -- Revert fields to previous value
-      fNew:copy(fNewDup)
+      fNew:copy(fDup)
       hamil:copy(hamilDup)
       myDt = dtSuggested
     else
@@ -552,12 +560,13 @@ end
 
 -- write data to H5 file
 function writeFields(frameNum, tCurr)
-   numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
+   --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
-   phi3dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
-   vParaSquaredKinetic:write( string.format("vParaSq_%d.h5", frameNum), tCurr)
-   hamil:write( string.format("hamil_%d.h5", frameNum), tCurr)
-   f:write( string.format("f_%d.h5", frameNum), tCurr)
+   numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
+   --phi3dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
+   --vParaSquaredKinetic:write( string.format("vParaSq_%d.h5", frameNum), tCurr)
+   --hamil:write( string.format("hamil_%d.h5", frameNum), tCurr)
+   --f:write( string.format("f_%d.h5", frameNum), tCurr)
    --phi3d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
 
@@ -565,21 +574,11 @@ end
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
+f:sync()
 -- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
 numDensityAdiabatic:copy(numDensityKinetic)
--- Compute background phi
-runUpdater(phiCalc, 0.0, 0.0, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
--- Apply bouncary conditions
-applyBcToBackgroundPotential(phi3d)
--- smooth potential
-runUpdater(smoothCalc, 0.0, 0.0, {phi3d}, {phi3dSmoothed})
-
--- Store background phi
-phi3dBackground:copy(phi3dSmoothed)
-applyBcToBackgroundPotential(phi3dBackground)
-
 -- Store background f
 fBackground:copy(f)
 
@@ -591,7 +590,7 @@ applyBcToTotalDistF(f)
 -- Compute potential with perturbation added
 calcNumDensity(f, numDensityKinetic)
 runUpdater(phiCalc, 0.0, 0.0, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
-applyBcToTotalPotential(phi3d)
+phi3d:sync()
 runUpdater(smoothCalc, 0.0, 0.0, {phi3d}, {phi3dSmoothed})
 phi3dSmoothed:sync()
 calcHamiltonian(hamilKE, phi3dSmoothed, hamil)
@@ -601,7 +600,6 @@ calcDiagnostics(0.0, 0.0)
 writeFields(0,0)
 
 tCurr = tStart
-fNew:copy(f)
 
 for frame = 1, nFrames do
   Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))

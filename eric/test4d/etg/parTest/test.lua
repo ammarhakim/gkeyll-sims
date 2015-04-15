@@ -3,7 +3,7 @@
 -- 4-15-2015: input file to test parallelization
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 2, 2, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 1, 1, 4} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -46,7 +46,7 @@ ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
 N_Y = 8
-N_VPARA = 4
+N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
@@ -116,13 +116,29 @@ f = DataStruct.Field4D {
    ghost = {1, 1},
 }
 -- for RK time-stepping
-f1 = f:duplicate()
+f1 = DataStruct.Field4D {
+   onGrid = grid_back_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- updated solution
-fNew = f:duplicate()
+fNew = DataStruct.Field4D {
+   onGrid = grid_back_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- for use in time-stepping
-fDup = f:duplicate()
+fDup = DataStruct.Field4D {
+   onGrid = grid_back_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- to store background distfElc
-fBackground = f:duplicate()
+fBackground = DataStruct.Field4D {
+   onGrid = grid_back_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 fFluctuating = DataStruct.Field4D {
    onGrid = grid_4d,
    numComponents = basis_4d:numNodes(),
@@ -177,7 +193,9 @@ initKineticFPerturb = Updater.EvalOnNodes4D {
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
+print('hello0')
 fInitialPerturb:sync()
+print('hello1')
 
 -- Magnetic Field (2D)
 bField2d = DataStruct.Field2D {
@@ -329,7 +347,7 @@ phi4d = DataStruct.Field4D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   onGrid = grid_2d,
   basis = basis_2d,
-  kzfTimesRhoSquared = n0,
+  n0 = n0,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
 }
