@@ -2,7 +2,7 @@
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 4, 2, 2, 1} }
+phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 4, 4, 1, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc3D.SubCartProd5D {
    decomposition = phaseDecomp,
