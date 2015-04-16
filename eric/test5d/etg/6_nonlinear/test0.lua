@@ -46,10 +46,10 @@ L_T        = R/6
 ky_min     = 2*math.pi/deltaR
 kz_min     = 2*math.pi/L_parallel
 -- grid parameters: number of cells
-N_X = 32
-N_Y = 32
-N_Z = 16
-N_VPARA = 8
+N_X = 16
+N_Y = 16
+N_Z = 8
+N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
