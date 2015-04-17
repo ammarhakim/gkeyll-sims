@@ -17,9 +17,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 10e-6
+tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 1000
+nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -46,7 +46,7 @@ ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 16
 N_Y = 16
-N_VPARA = 6
+N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R

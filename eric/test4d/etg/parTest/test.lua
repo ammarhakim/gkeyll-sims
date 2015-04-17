@@ -3,7 +3,7 @@
 -- 4-15-2015: input file to test parallelization
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 1, 4, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -17,7 +17,7 @@ polyOrder = 2
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 0.5e-6
+tEnd = .15e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames

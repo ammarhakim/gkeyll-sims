@@ -3,7 +3,7 @@
 -- (0,1,0,0; -1,0,0,0; 0,0,0,0; 0,0,0,0) for this test
 
 -- polynomial order
-polyOrder = 1
+polyOrder = 2
 
 -- cfl number to use
 cfl = 0.1
@@ -15,13 +15,13 @@ Tperiod = 1.5
 grid = Grid.RectCart4D {
    lower = {0, 0, 0, 0},
    upper = {1.0, 1.0, 1.0, 1.0},
-   cells = {32, 32, 2, 2},
+   cells = {16, 16, 2, 2},
 }
 -- spatial grid
 grid_2d = Grid.RectCart2D {
    lower = {0, 0},
    upper = {1.0, 1.0},
-   cells = {32, 32},
+   cells = {16, 16},
 }
 
 -- A generic function to run an updater.
@@ -300,7 +300,7 @@ end
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 2*Tperiod
+tEnd = .25*Tperiod
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 40
 tFrame = (tEnd-tStart)/nFrames -- time between frames

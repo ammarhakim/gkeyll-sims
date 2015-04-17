@@ -5,11 +5,11 @@
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.05
+cfl = 0.025
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-8
-dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
+tEnd = 2.5e-6
+dtSuggested = 0.1*tEnd --0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
@@ -106,15 +106,39 @@ f = DataStruct.Field4D {
    ghost = {1, 1},
 }
 -- for RK time-stepping
-f1 = f:duplicate()
+f1 = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- updated solution
-fNew = f:duplicate()
+fNew = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- for use in time-stepping
-fDup = f:duplicate()
+fDup = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- to store background distfElc
-fBackground = f:duplicate()
-fFluctuating = f:duplicate()
-fInitialPerturb = fFluctuating:duplicate()
+fBackground = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
+fFluctuating = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
+fInitialPerturb = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 
 function bFieldProfile(x)
   return B0*R/x
@@ -269,8 +293,16 @@ numDensityKinetic = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-numDensityAdiabatic = numDensityKinetic:duplicate()
-numDensityDelta = numDensityKinetic:duplicate()
+numDensityAdiabatic = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+numDensityDelta = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 -- to compute number density
 numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- 4D phase-space grid 
@@ -289,7 +321,11 @@ phi2d = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-phi2dSmoothed = phi2d:duplicate()
+phi2dSmoothed = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- to store electrostatic potential for addition to hamiltonian
 phi4d = DataStruct.Field4D {
@@ -339,7 +375,7 @@ function calcHamiltonian(hamilKeIn, phi2dIn, hamilOut)
   -- copy 2d potential to 4d field
   runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dIn}, {phi4d})
   phi4d:sync()
-  --hamilOut:accumulate(kineticCharge, phi4d)
+  hamilOut:accumulate(kineticCharge, phi4d)
   hamilOut:sync()
 end
 
@@ -499,7 +535,7 @@ end
 
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
--- Scale distribution function and apply bcs
+-- Scale distribution function and apply bcs (don't call f:sync() after this!!!)
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
 -- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
