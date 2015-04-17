@@ -310,7 +310,7 @@ phi4d = DataStruct.Field4D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   onGrid = grid_2d,
   basis = basis_2d,
-  kzfTimesRhoSquared = 1,
+  n0 = n0,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
 }
@@ -319,6 +319,7 @@ phiCalc = Updater.ETGAdiabaticPotentialUpdater {
 smoothCalc = Updater.SimpleSmoothToC02D {
    onGrid = grid_back_2d,
    basis = basis_2d,
+   polyOrder = polyOrder,
 }
 
 multiply4dCalc = Updater.FieldArithmeticUpdater4D {
