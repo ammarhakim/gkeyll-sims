@@ -1,7 +1,7 @@
 -- Input file for Poisson bracket operator
 
 -- polynomial order
-polyOrder = 1
+polyOrder = 2
 
 -- cfl number to use
 cfl = 0.1
@@ -21,7 +21,7 @@ end
 grid = Grid.RectCart2D {
    lower = {0, 0},
    upper = {1.0, 1.0},
-   cells = {8, 8},
+   cells = {16, 16},
 }
 
 -- create FEM nodal basis

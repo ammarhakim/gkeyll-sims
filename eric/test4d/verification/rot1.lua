@@ -107,6 +107,7 @@ pbSlvr = Updater.PoissonBracket2D {
    fluxType = "upwind",
    -- equation to solve
    equation = advectionEqn,
+   jacobianField = 0,
 }
 
 -- write initial value
@@ -262,9 +263,9 @@ end
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 2.0
+tEnd = 4.0
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 1
+nFrames = 40
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 tCurr = tStart
