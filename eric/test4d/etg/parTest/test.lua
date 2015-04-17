@@ -3,7 +3,7 @@
 -- 4-15-2015: input file to test parallelization
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 1, 1, 4} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 1, 4, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -11,13 +11,13 @@ confDecomp = DecompRegionCalc2D.SubCartProd4D {
 }
 
 -- polynomial order
-polyOrder = 1
+polyOrder = 2
 
 -- cfl number to use
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-6
+tEnd = 0.5e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -46,7 +46,7 @@ ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
 N_Y = 8
-N_VPARA = 8
+N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
@@ -193,9 +193,7 @@ initKineticFPerturb = Updater.EvalOnNodes4D {
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
-print('hello0')
 fInitialPerturb:sync()
-print('hello1')
 
 -- Magnetic Field (2D)
 bField2d = DataStruct.Field2D {
@@ -356,6 +354,7 @@ phiCalc = Updater.ETGAdiabaticPotentialUpdater {
 smoothCalc = Updater.SimpleSmoothToC02D {
    onGrid = grid_2d,
    basis = basis_2d,
+   polyOrder = polyOrder,
 }
 
 multiply4dCalc = Updater.FieldArithmeticUpdater4D {
