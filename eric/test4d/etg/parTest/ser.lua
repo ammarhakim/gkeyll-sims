@@ -2,13 +2,13 @@
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 
 -- polynomial order
-polyOrder = 1
+polyOrder = 2
 
 -- cfl number to use
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-6
+tEnd = 1e-8
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -302,15 +302,16 @@ phi4d = DataStruct.Field4D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   onGrid = grid_2d,
   basis = basis_2d,
-  kzfTimesRhoSquared = 1,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
+  n0 = n0,
 }
 
 -- Updater to smooth out 2d field (phi)
 smoothCalc = Updater.SimpleSmoothToC02D {
    onGrid = grid_back_2d,
    basis = basis_2d,
+   polyOrder = polyOrder,
 }
 
 multiply4dCalc = Updater.FieldArithmeticUpdater4D {
@@ -338,7 +339,7 @@ function calcHamiltonian(hamilKeIn, phi2dIn, hamilOut)
   -- copy 2d potential to 4d field
   runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dIn}, {phi4d})
   phi4d:sync()
-  hamilOut:accumulate(kineticCharge, phi4d)
+  --hamilOut:accumulate(kineticCharge, phi4d)
   hamilOut:sync()
 end
 
