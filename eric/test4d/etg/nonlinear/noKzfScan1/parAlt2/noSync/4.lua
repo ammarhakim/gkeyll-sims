@@ -1,7 +1,8 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 -- 4-15-2015: input file to test parallelization
--- Another attempt at the /noKzfScan1 simulation.
+-- Similar to parAlt1, but with different velocity space boundaries
+-- Also removed the f:sync() command after scaling
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
@@ -18,9 +19,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 45e-6
+tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 1000
+nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -54,14 +55,10 @@ X_LOWER = R
 X_UPPER = R + deltaR
 Y_LOWER = -deltaR/2
 Y_UPPER = deltaR/2
-VPARA_LOWER = -math.sqrt(N_VPARA)*vtKinetic
-VPARA_UPPER = math.sqrt(N_VPARA)*vtKinetic
+VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
+VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.sqrt(N_MU/2)*2*kineticMass*vtKinetic*vtKinetic/B0
---VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
---VPARA_LOWER = -VPARA_UPPER
---MU_LOWER = 0
---MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -538,7 +535,7 @@ end
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
---f:sync()
+f:sync()
 -- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
