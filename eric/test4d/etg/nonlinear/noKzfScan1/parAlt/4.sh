@@ -1,5 +1,5 @@
 #!/bin/bash 
-#PBS -N par-alt-1
+#PBS -N par-4
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
