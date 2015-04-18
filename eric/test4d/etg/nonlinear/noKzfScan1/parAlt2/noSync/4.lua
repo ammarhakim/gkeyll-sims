@@ -535,7 +535,7 @@ end
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
-f:sync()
+--f:sync()
 -- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
