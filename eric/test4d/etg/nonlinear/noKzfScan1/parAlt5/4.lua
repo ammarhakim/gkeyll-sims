@@ -4,7 +4,7 @@
 -- High resolution version
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 2, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 4, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,

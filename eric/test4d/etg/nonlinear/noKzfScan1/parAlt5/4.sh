@@ -1,9 +1,9 @@
 #!/bin/bash 
-#PBS -N par-alt-3
+#PBS -N par-alt-4
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
-#PBS -l nodes=8:ppn=16
+#PBS -l nodes=4:ppn=16
 #PBS -l mem=128000mb
 #PBS -l walltime=24:00:00
 #PBS -r n
