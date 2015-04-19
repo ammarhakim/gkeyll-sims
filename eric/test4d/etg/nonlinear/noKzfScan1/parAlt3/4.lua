@@ -530,7 +530,7 @@ end
 function writeFields(frameNum, tCurr)
    --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
-   --phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
+   phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
    numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
