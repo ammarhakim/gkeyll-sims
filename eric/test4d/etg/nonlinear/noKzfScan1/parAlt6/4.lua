@@ -1,16 +1,26 @@
 -- Input file for ETG test problem
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
+-- 4-15-2015: input file to test parallelization
+-- High resolution version
+
+-- phase-space decomposition
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 4, 1} }
+-- configuration space decomposition
+confDecomp = DecompRegionCalc2D.SubCartProd4D {
+   decomposition = phaseDecomp,
+   collectDirections = {0, 1},
+}
 
 -- polynomial order
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.025
+cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = .4e-6
-dtSuggested = 0.1*tEnd --0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 10
+tEnd = 45e-6
+dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
+nFrames = 1000
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -35,8 +45,8 @@ deltaR    = 32*rho_s
 L_T       = R/4
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 4
-N_Y = 8
+N_X = 16
+N_Y = 16
 N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
@@ -65,19 +75,19 @@ function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
    return updater:advance(currTime+timeStep)
 end
 
--- GRID NOTES
--- Even though non-fluctuating components are stored on the fluctuating
--- grids (which have periodicity in certain directions), they are never
--- called with sync() which makes this okay.
--- Additionally, grid_back_2d can probably be eliminated since it is 0
--- but I am keeping this in case it is not 0 somehow.
-
 -- full 4d phase space grid
 grid_4d = Grid.RectCart4D {
    lower = {X_LOWER, Y_LOWER, VPARA_LOWER, MU_LOWER},
    upper = {X_UPPER, Y_UPPER, VPARA_UPPER, MU_UPPER},
    cells = {N_X, N_Y, N_VPARA, N_MU},
    periodicDirs = {0, 1},
+   decomposition = phaseDecomp,
+}
+grid_back_4d = Grid.RectCart4D {
+   lower = {X_LOWER, Y_LOWER, VPARA_LOWER, MU_LOWER},
+   upper = {X_UPPER, Y_UPPER, VPARA_UPPER, MU_UPPER},
+   cells = {N_X, N_Y, N_VPARA, N_MU},
+   decomposition = phaseDecomp,
 }
 -- 2d spatial grid
 grid_2d = Grid.RectCart2D {
@@ -85,12 +95,13 @@ grid_2d = Grid.RectCart2D {
    upper = {X_UPPER, Y_UPPER},
    cells = {N_X, N_Y},
    periodicDirs = {0, 1},
+   decomposition = confDecomp,
 }
 grid_back_2d = Grid.RectCart2D {
    lower = {X_LOWER, Y_LOWER},
    upper = {X_UPPER, Y_UPPER},
    cells = {N_X, N_Y},
-   periodicDirs = {1},
+   decomposition = confDecomp,
 }
 -- create 4d basis functions
 basis_4d = NodalFiniteElement4D.SerendipityElement {
@@ -105,34 +116,18 @@ basis_2d = NodalFiniteElement2D.SerendipityElement {
 
 -- distribution function for electrons
 f = DataStruct.Field4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
 -- for RK time-stepping
-f1 = DataStruct.Field4D {
-   onGrid = grid_4d,
-   numComponents = basis_4d:numNodes(),
-   ghost = {1, 1},
-}
+f1 = f:duplicate()
 -- updated solution
-fNew = DataStruct.Field4D {
-   onGrid = grid_4d,
-   numComponents = basis_4d:numNodes(),
-   ghost = {1, 1},
-}
+fNew = f:duplicate()
 -- for use in time-stepping
-fDup = DataStruct.Field4D {
-   onGrid = grid_4d,
-   numComponents = basis_4d:numNodes(),
-   ghost = {1, 1},
-}
+fDup = f:duplicate()
 -- to store background distfElc
-fBackground = DataStruct.Field4D {
-   onGrid = grid_4d,
-   numComponents = basis_4d:numNodes(),
-   ghost = {1, 1},
-}
+fBackground = f:duplicate()
 fFluctuating = DataStruct.Field4D {
    onGrid = grid_4d,
    numComponents = basis_4d:numNodes(),
@@ -153,7 +148,12 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y)
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  --linear
+  --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  --nonlinear
+  local x0 = (X_LOWER+X_UPPER)/2
+  local sigma = deltaR/4
+  return (vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
 end
 
 function fProfile(x,y,v,mu)
@@ -164,7 +164,7 @@ end
 
 -- initialize electron distribution function
 initKineticF = Updater.EvalOnNodes4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    basis = basis_4d,
    shareCommonNodes = false,
    -- function to use for initialization
@@ -173,6 +173,7 @@ initKineticF = Updater.EvalOnNodes4D {
 	 end
 }
 runUpdater(initKineticF, 0.0, 0.0, {}, {f})
+f:sync()
 
 -- initialize perturbation to electron distribution function
 -- does not contain f_0, instead this will be multiplied with f_0
@@ -186,16 +187,17 @@ initKineticFPerturb = Updater.EvalOnNodes4D {
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
+fInitialPerturb:sync()
 
 -- Magnetic Field (2D)
 bField2d = DataStruct.Field2D {
-   onGrid = grid_2d,
+   onGrid = grid_back_2d,
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
 -- Updater to initialize bfield2d
 initb = Updater.EvalOnNodes2D {
-  onGrid = grid_2d,
+  onGrid = grid_back_2d,
   basis = basis_2d,
   shareCommonNodes = false,
   evaluate = function (x,y,t)
@@ -203,6 +205,7 @@ initb = Updater.EvalOnNodes2D {
   end
 }
 runUpdater(initb, 0.0, 0.0, {}, {bField2d})
+bField2d:sync()
 
 -- to copy phi to a 4d field
 copy2dTo4d = Updater.NodalCopy2DTo4DFieldUpdater {
@@ -218,12 +221,12 @@ copy2dTo4d = Updater.NodalCopy2DTo4DFieldUpdater {
 
 -- Jacobian Factor (4D)
 jacobianField = DataStruct.Field4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
 initJacobian = Updater.EvalOnNodes4D {
-  onGrid = grid_4d,
+  onGrid = grid_back_4d,
   basis = basis_4d,
   shareCommonNodes = false,
   evaluate = function (x,y,t)
@@ -232,16 +235,17 @@ initJacobian = Updater.EvalOnNodes4D {
 }
 -- Fill out jacobian
 runUpdater(initJacobian, 0.0, 0.0, {}, {jacobianField})
+jacobianField:sync()
 
 -- B_y^* field (4D)
 bStarYField = DataStruct.Field4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
 -- Updater to initialize bStarY
 initbStarY = Updater.EvalOnNodes4D {
-  onGrid = grid_4d,
+  onGrid = grid_back_4d,
   basis = basis_4d,
   shareCommonNodes = false,
   evaluate = function (x,y,vPara,mu,t)
@@ -249,6 +253,7 @@ initbStarY = Updater.EvalOnNodes4D {
   end
 }
 runUpdater(initbStarY, 0.0, 0.0, {}, {bStarYField})
+bStarYField:sync()
 
 -- define equation to solve
 gyroEqn = PoissonBracketEquation.GyroEquation4D {
@@ -272,7 +277,7 @@ pbSlvr = Updater.PoissonBracketOpt4D {
 
 -- Hamiltonian
 hamil = DataStruct.Field4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
@@ -282,7 +287,7 @@ hamilDup = hamil:duplicate()
 hamilKE = hamil:duplicate()
 -- Updater to initialize KE part of hamil
 initHamilKE = Updater.EvalOnNodes4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    basis = basis_4d,
    shareCommonNodes = false,
    evaluate = function (x,y,vPara,mu,t)
@@ -290,23 +295,16 @@ initHamilKE = Updater.EvalOnNodes4D {
    end
 }
 runUpdater(initHamilKE, 0.0, 0.0, {}, {hamilKE})
+hamilKE:sync()
 
 -- to store number density
 numDensityKinetic = DataStruct.Field2D {
-   onGrid = grid_2d,
+   onGrid = grid_back_2d,
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-numDensityAdiabatic = DataStruct.Field2D {
-   onGrid = grid_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
-}
-numDensityDelta = DataStruct.Field2D {
-   onGrid = grid_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
-}
+numDensityAdiabatic = numDensityKinetic:duplicate()
+numDensityDelta = numDensityKinetic:duplicate()
 -- to compute number density
 numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- 4D phase-space grid 
@@ -319,7 +317,7 @@ numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    moment = 0,
 }
 
--- to store the electrostatic potential on spatial grid
+-- to store the (fluctuating) electrostatic potential on spatial grid
 phi2d = DataStruct.Field2D {
    onGrid = grid_2d,
    numComponents = basis_2d:numNodes(),
@@ -330,7 +328,6 @@ phi2dSmoothed = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-
 -- to store electrostatic potential for addition to hamiltonian
 phi4d = DataStruct.Field4D {
   onGrid = grid_4d,
@@ -342,16 +339,15 @@ phi4d = DataStruct.Field4D {
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   onGrid = grid_2d,
   basis = basis_2d,
+  n0 = n0,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
-  n0 = n0,
 }
 
 -- Updater to smooth out 2d field (phi)
 smoothCalc = Updater.SimpleSmoothToC02D {
-   onGrid = grid_back_2d,
+   onGrid = grid_2d,
    basis = basis_2d,
-   polyOrder = polyOrder,
 }
 
 multiply4dCalc = Updater.FieldArithmeticUpdater4D {
@@ -371,6 +367,7 @@ function applyBcToTotalDistF(fld)
   fFluctuating:sync()
   -- Add back to total field
   fld:accumulate(1.0, fFluctuating)
+  fld:sync()
 end
 
 function calcHamiltonian(hamilKeIn, phi2dIn, hamilOut)
@@ -408,6 +405,7 @@ scaleInitDistF = Updater.ETGInitializeDensity {
 function calcNumDensity(fIn, nOut)
   runUpdater(numDensityCalc, 0.0, 0.0, {fIn, bField2d}, {nOut})
   nOut:scale(2*math.pi/kineticMass)
+  --nOut:sync()
 end
 
 function calcDiagnostics(curr, dt)
@@ -530,17 +528,17 @@ end
 
 -- write data to H5 file
 function writeFields(frameNum, tCurr)
-   numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
+   --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
    numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
-
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
--- Scale distribution function and apply bcs (don't call f:sync() after this!!!)
+-- Scale distribution function and apply bcs
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
+--f:sync()
 -- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
@@ -550,6 +548,7 @@ fBackground:copy(f)
 
 -- Add perturbation to f
 runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
+--fNew:sync()
 f:copy(fNew)
 -- Apply boundary conditions
 applyBcToTotalDistF(f)
