@@ -12,7 +12,7 @@ confDecomp = DecompRegionCalc2D.SubCartProd4D {
 }
 
 -- polynomial order
-polyOrder = 2
+polyOrder = 1
 
 -- cfl number to use
 cfl = 0.05
