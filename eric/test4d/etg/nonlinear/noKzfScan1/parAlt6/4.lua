@@ -15,10 +15,10 @@ confDecomp = DecompRegionCalc2D.SubCartProd4D {
 polyOrder = 2
 
 -- cfl number to use
-cfl = 0.05
+cfl = 0.025
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-6
+tEnd = 2e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
