@@ -4,7 +4,7 @@
 -- High resolution version
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 4, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -18,9 +18,9 @@ polyOrder = 2
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 45e-6
+tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 1000
+nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -61,7 +61,7 @@ Y_UPPER = deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(16, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -348,6 +348,7 @@ phiCalc = Updater.ETGAdiabaticPotentialUpdater {
 smoothCalc = Updater.SimpleSmoothToC02D {
    onGrid = grid_2d,
    basis = basis_2d,
+   polyOrder = polyOrder,
 }
 
 multiply4dCalc = Updater.FieldArithmeticUpdater4D {
