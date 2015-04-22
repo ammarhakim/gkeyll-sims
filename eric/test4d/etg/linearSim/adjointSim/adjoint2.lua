@@ -15,6 +15,7 @@ tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 2
 tFrame = (tEnd-tStart)/nFrames -- time between frames
+iterTotal = 3
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -846,7 +847,7 @@ end
 function writeFields(frameNum, tCurr)
    --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    --numDensityKineticBackground:write( string.format("n0_%d.h5", frameNum), tCurr)
-   numDensityKineticPerturbed:write( string.format("nDelta_%d.h5", frameNum), tCurr)
+   --numDensityKineticPerturbed:write( string.format("nDelta_%d.h5", frameNum), tCurr)
    --vPara:write( string.format("vPara_%d.h5", frameNum), tCurr)
    --vParaSq:write( string.format("vParaSq_%d.h5", frameNum), tCurr)
    --fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
@@ -883,12 +884,12 @@ runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
 phi2dSmoothed:sync()
 calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
 
-iterTotal = 10
 -- Adjoint iteration
-for iter = 1, iterTotal do
+for iter = 0, iterTotal-1 do
   -- calculate free energy at time 0
   calcFreeEnergy(2*iter-1, 0.0, f, tempFreeEnergy)
   W_0 = tempFreeEnergy:lastInsertedData()
+  calcDiagnostics(0.0, 0.0)
   -- perform standard iteration to time tEnd
   Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
   dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
@@ -916,3 +917,11 @@ for iter = 1, iterTotal do
   -- calculate f at time 0
   f:scale(W_0*W_0/(2*W_T))
 end
+
+-- final iteration to compute amplification
+calcDiagnostics(0.0, 0.0)
+-- perform standard iteration to time tEnd
+Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
+dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
+Lucee.logInfo ("")
+freeEnergy:write( string.format("freeEnergy_%d.h5", iterTotal), tEnd)
