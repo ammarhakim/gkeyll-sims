@@ -15,7 +15,7 @@ tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 2
 tFrame = (tEnd-tStart)/nFrames -- time between frames
-iterTotal = 3
+iterTotal = 30
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
