@@ -13,8 +13,6 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 2
-tFrame = (tEnd-tStart)/nFrames -- time between frames
 iterTotal = 60
 
 -- physical parameters
@@ -39,7 +37,7 @@ deltaR    = 32*rho_s
 L_T       = R/4
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 4
+N_X = 8
 N_Y = 8
 N_VPARA = 4
 N_MU = N_VPARA/2
@@ -51,7 +49,7 @@ Y_UPPER = deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -918,11 +916,12 @@ for iter = 0, iterTotal-1 do
   f:scale(W_0*W_0/(2*W_T))
 end
 
--- write out final iteration fields
-f:write( string.format("f_%d.h5", 0), 0.0)
-
 -- final iteration to compute amplification
 calcDiagnostics(0.0, 0.0)
+-- write out final iteration fields
+f:write( string.format("f_%d.h5", 0), 0.0)
+numDensityKineticPerturbed:write( string.format("n_%d.h5", 0), 0.0)
+kineticTempField:write( string.format("kineticTemp_%d.h5", 0), 0.0)
 -- perform standard iteration to time tEnd
 Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
 dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
