@@ -3,21 +3,7 @@
 -- 4-15-2015: input file to test parallelization
 
 -- phase-space decomposition
-<<<<<<< local
-<<<<<<< local
-<<<<<<< local
-=======
->>>>>>> other
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
-<<<<<<< local
-=======
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 2, 2, 1} }
->>>>>>> other
-=======
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 1, 1, 4} }
->>>>>>> other
-=======
->>>>>>> other
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
