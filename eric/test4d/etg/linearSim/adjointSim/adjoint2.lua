@@ -15,7 +15,7 @@ tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 2
 tFrame = (tEnd-tStart)/nFrames -- time between frames
-iterTotal = 30
+iterTotal = 60
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -878,14 +878,14 @@ runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
 f:copy(fNew)
 -- Apply boundary conditions
 applyBcToPerturbedDistF(f)
--- Compute initial potential with perturbation added
-calcPotential(phi2d, f)
-runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
-phi2dSmoothed:sync()
-calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
 
 -- Adjoint iteration
 for iter = 0, iterTotal-1 do
+  -- Compute initial potential with perturbation added
+  calcPotential(phi2d, f)
+  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
+  phi2dSmoothed:sync()
+  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
   -- calculate free energy at time 0
   calcFreeEnergy(2*iter-1, 0.0, f, tempFreeEnergy)
   W_0 = tempFreeEnergy:lastInsertedData()
@@ -917,6 +917,9 @@ for iter = 0, iterTotal-1 do
   -- calculate f at time 0
   f:scale(W_0*W_0/(2*W_T))
 end
+
+-- write out final iteration fields
+f:write( string.format("f_%d.h5", 0), 0.0)
 
 -- final iteration to compute amplification
 calcDiagnostics(0.0, 0.0)
