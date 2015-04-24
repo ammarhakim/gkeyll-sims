@@ -11,9 +11,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-6
+tEnd = 5e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTotal = 60
+iterTotal = 50
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -34,7 +34,7 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/4
+L_T       = R/2
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 8
@@ -143,7 +143,7 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y)
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.random()
 end
 
 function fProfile(x,y,v,mu)
@@ -174,7 +174,6 @@ initKineticFPerturb = Updater.EvalOnNodes4D {
 		 return perturbDensityProfile(x,y)
 	 end
 }
-runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
 
 -- Magnetic Field (2D)
 bField2d = DataStruct.Field2D {
@@ -870,23 +869,21 @@ fBackground:copy(f)
 calcBackgroundTemperature(fBackground, 0.0, 0.0, backgroundKineticTemp)
 runUpdater(copy2dTo4d, 0.0, 0.0, {backgroundKineticTemp}, {backgroundKineticTemp4d})
 
--- Compute total perturbed distribution function using scaled fBackground
-runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
--- Set f to perturbed f
-f:copy(fNew)
--- Apply boundary conditions
-applyBcToPerturbedDistF(f)
-
 -- Adjoint iteration
 for iter = 0, iterTotal-1 do
+  -- randomize initial conditions
+  runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
+  -- Compute total perturbed distribution function using scaled fBackground
+  runUpdater(multiply4dCalc, 0.0, 0.0, {fBackground, fInitialPerturb}, {fNew})
+  -- Set f to perturbed f
+  f:copy(fNew)
+  -- Apply boundary conditions
+  applyBcToPerturbedDistF(f)
   -- Compute initial potential with perturbation added
   calcPotential(phi2d, f)
   runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
   phi2dSmoothed:sync()
   calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
-  -- calculate free energy at time 0
-  calcFreeEnergy(2*iter-1, 0.0, f, tempFreeEnergy)
-  W_0 = tempFreeEnergy:lastInsertedData()
   calcDiagnostics(0.0, 0.0)
   -- write out initial number density data
   numDensityKineticPerturbed:write( string.format("n_%d.h5", iter), 0.0)
@@ -894,46 +891,5 @@ for iter = 0, iterTotal-1 do
   Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
   dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
   Lucee.logInfo ("")
-  -- calculate free energy at time tEnd
-  calcFreeEnergy(2*iter, 0.0, f, tempFreeEnergy)
-  W_T = tempFreeEnergy:lastInsertedData()
   freeEnergy:write( string.format("freeEnergy_%d.h5", iter), tEnd)
-  -- calculate fAdjoint at time T
-  --f:scale(2/W_0)
-  -- recompute initial potential and hamiltonian with scaled f
-  calcPotential(phi2d, f)
-  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
-  phi2dSmoothed:sync()
-  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
-  -- calculate initial adjoint potential
-  calcAdjointPotential(0.0, 0.0, f, adjointPotential)
-  runUpdater(copy2dTo4d, 0.0, 0.0, {adjointPotential}, {adjointPotential4d})
-  runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dSmoothed}, {phi4dSmoothed})
-
-  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tEnd, tStart))
-  dtSuggested = advanceFrameAdjoint(tStart, tEnd, dtSuggested)
-  Lucee.logInfo ("")
-  
-  -- calculate f at time 0
-  --f:scale(W_0*W_0/(2*W_T))
-
-  -- net scaling
-  Lucee.logInfo (string.format("-- Scaled f by %g ", W_0/W_T))
 end
-
--- final iteration to compute amplification
-calcDiagnostics(0.0, 0.0)
--- write out final iteration fields
-f:write( string.format("f_%d.h5", iterTotal), 0.0)
-numDensityKineticPerturbed:write( string.format("n_%d.h5", iterTotal), 0.0)
-kineticTempField:write( string.format("kineticTemp_%d.h5", iterTotal), 0.0)
--- Compute initial potential with perturbation added
-calcPotential(phi2d, f)
-runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
-phi2dSmoothed:sync()
-calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
--- perform standard iteration to time tEnd
-Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
-dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
-Lucee.logInfo ("")
-freeEnergy:write( string.format("freeEnergy_%d.h5", iterTotal), tEnd)
