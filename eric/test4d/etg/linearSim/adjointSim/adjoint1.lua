@@ -2,7 +2,7 @@
 -- Species are referred to as the 'kinetic' or 'adiabatic' specie
 -- 4-4-2015: Split original full-F simulation into a delta F simulation
 -- 4-10-2015: Added free energy calculation. Haven't debugged adjoint looping yet.
--- 4-22-2015: Does one loop iteration with printouts for the adjoint portion.
+-- 4-22-2015: More testing
 
 -- polynomial order
 polyOrder = 1
@@ -11,10 +11,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-8
+tEnd = 3.82e-7
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 2
-tFrame = (tEnd-tStart)/nFrames -- time between frames
+iterTotal = 60
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -38,7 +37,7 @@ deltaR    = 32*rho_s
 L_T       = R/2
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 4
+N_X = 8
 N_Y = 8
 N_VPARA = 4
 N_MU = N_VPARA/2
@@ -50,7 +49,7 @@ Y_UPPER = deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -526,14 +525,11 @@ function calcTotalNumDensity(nBackground, nPerturbed, nTotal)
 end
 
 function calcDiagnostics(curr, dt)
-  runUpdater(vParaCalc, curr, dt, {f, bField2d}, {vPara})
-  vPara:scale(2*math.pi/kineticMass)
-  runUpdater(vParaSqCalc, curr, dt, {f, bField2d}, {vParaSq})
-  vParaSq:scale(2*math.pi/kineticMass)
-  runUpdater(fieldEnergyCalc, curr, dt, {phi2dSmoothed}, {fieldEnergy})
-
-  calcNumDensity(f, numDensityKineticPerturbed)
-  calcTemperature(f, curr, dt, kineticTempField)
+  --runUpdater(vParaCalc, curr, dt, {f, bField2d}, {vPara})
+  --vPara:scale(2*math.pi/kineticMass)
+  --runUpdater(vParaSqCalc, curr, dt, {f, bField2d}, {vParaSq})
+  --vParaSq:scale(2*math.pi/kineticMass)
+  --runUpdater(fieldEnergyCalc, curr, dt, {phi2dSmoothed}, {fieldEnergy})
   calcFreeEnergy(curr, dt, f, freeEnergy)
 end
 
@@ -544,9 +540,24 @@ function calcTemperature(fIn, curr, dt, outputField)
 
   runUpdater(muCalc, curr, dt, {fFull, bField2d}, {muMoment})
   muMoment:scale(2*math.pi/kineticMass)
-  runUpdater(multiply2dCalc, curr, dt, {bField2d, muMoment}, {muMomentTimesB})
+  runUpdater(multi/p/gke/eshi/gkeyllall/gkeyll-sims/eric/test4d/etg/linearSim/adjointSimply2dCalc, curr, dt, {bField2d, muMoment}, {muMomentTimesB})
 
   runUpdater(vParaSqCalc, curr, dt, {fFull, bField2d}, {vParaSq})
+  vParaSq:scale(2*math.pi/kineticMass)
+
+  outputField:clear(0.0)
+  outputField:accumulate(kineticMass/(3*n0), vParaSq)
+  outputField:accumulate(2/(3*n0), muMomentTimesB)
+  outputField:scale(1/eV)
+end
+
+-- Return temperature of a background distribution function (in eV?)
+function calcBackgroundTemperature(fIn, curr, dt, outputField)
+  runUpdater(muCalc, curr, dt, {fIn, bField2d}, {muMoment})
+  muMoment:scale(2*math.pi/kineticMass)
+  runUpdater(multiply2dCalc, curr, dt, {bField2d, muMoment}, {muMomentTimesB})
+
+  runUpdater(vParaSqCalc, curr, dt, {fIn, bField2d}, {vParaSq})
   vParaSq:scale(2*math.pi/kineticMass)
 
   outputField:clear(0.0)
@@ -589,6 +600,8 @@ end
 
 -- (in eV?)
 function calcFreeEnergy(curr, dt, fIn, freeEnergyOut)
+  calcNumDensity(fIn, numDensityKineticPerturbed)
+  --calcTemperature(f, curr, dt, kineticTempField)
   runUpdater(freeEnergyCalc, curr, dt, {bField2d, backgroundKineticTemp,
     numDensityKineticBackground, numDensityKineticPerturbed, fBackground, fIn}, {freeEnergyOut})
 end
@@ -781,7 +794,7 @@ function advanceFrame(tStart, tEnd, initDt)
 
       myDt = dtSuggested
     else
-      --calcDiagnostics(tCurr, myDt)
+      calcDiagnostics(tCurr, myDt)
       tCurr = tCurr + myDt
       myDt = dtSuggested
       step = step + 1
@@ -842,20 +855,6 @@ function advanceFrameAdjoint(tStart, tEnd, initDt)
   return dtSuggested
 end
 
--- write data to H5 file
-function writeFields(frameNum, tCurr)
-   --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
-   --numDensityKineticBackground:write( string.format("n0_%d.h5", frameNum), tCurr)
-   numDensityKineticPerturbed:write( string.format("nDelta_%d.h5", frameNum), tCurr)
-   --vPara:write( string.format("vPara_%d.h5", frameNum), tCurr)
-   --vParaSq:write( string.format("vParaSq_%d.h5", frameNum), tCurr)
-   --fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
-   --freeEnergy:write( string.format("freeEnergy_%d.h5", frameNum), tCurr)
-   --kineticTempField:write( string.format("kineticTemp_%d.h5", frameNum), tCurr)
-   --phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
-   --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
-end
-
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
@@ -868,7 +867,7 @@ numDensityKineticBackground:copy(numDensityKinetic)
 -- Store background f
 fBackground:copy(f)
 -- Compute background f's temperature
-calcTemperature(fBackground, 0.0, 0.0, backgroundKineticTemp)
+calcBackgroundTemperature(fBackground, 0.0, 0.0, backgroundKineticTemp)
 runUpdater(copy2dTo4d, 0.0, 0.0, {backgroundKineticTemp}, {backgroundKineticTemp4d})
 
 -- Compute total perturbed distribution function using scaled fBackground
@@ -877,56 +876,64 @@ runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
 f:copy(fNew)
 -- Apply boundary conditions
 applyBcToPerturbedDistF(f)
--- Compute potential with perturbation added
+
+-- Adjoint iteration
+for iter = 0, iterTotal-1 do
+  -- Compute initial potential with perturbation added
+  calcPotential(phi2d, f)
+  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
+  phi2dSmoothed:sync()
+  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
+  -- calculate free energy at time 0
+  calcFreeEnergy(2*iter-1, 0.0, f, tempFreeEnergy)
+  W_0 = tempFreeEnergy:lastInsertedData()
+  calcDiagnostics(0.0, 0.0)
+  -- write out initial number density data
+  numDensityKineticPerturbed:write( string.format("n_%d.h5", iter), 0.0)
+  -- perform standard iteration to time tEnd
+  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
+  dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
+  Lucee.logInfo ("")
+  -- calculate free energy at time tEnd
+  calcFreeEnergy(2*iter, 0.0, f, tempFreeEnergy)
+  W_T = tempFreeEnergy:lastInsertedData()
+  freeEnergy:write( string.format("freeEnergy_%d.h5", iter), tEnd)
+  -- calculate fAdjoint at time T
+  f:scale(2/W_0)
+  -- recompute initial potential and hamiltonian with scaled f
+  calcPotential(phi2d, f)
+  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
+  phi2dSmoothed:sync()
+  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
+  -- calculate initial adjoint potential
+  calcAdjointPotential(0.0, 0.0, f, adjointPotential)
+  runUpdater(copy2dTo4d, 0.0, 0.0, {adjointPotential}, {adjointPotential4d})
+  runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dSmoothed}, {phi4dSmoothed})
+
+  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tEnd, tStart))
+  dtSuggested = advanceFrameAdjoint(tStart, tEnd, dtSuggested)
+  Lucee.logInfo ("")
+  
+  -- calculate f at time 0
+  f:scale(W_0*W_0/(2*W_T))
+
+  -- net scaling
+  Lucee.logInfo (string.format("-- Scaled f by %g ", W_0/W_T))
+end
+
+-- final iteration to compute amplification
+calcDiagnostics(0.0, 0.0)
+-- write out final iteration fields
+f:write( string.format("f_%d.h5", iterTotal), 0.0)
+numDensityKineticPerturbed:write( string.format("n_%d.h5", iterTotal), 0.0)
+kineticTempField:write( string.format("kineticTemp_%d.h5", iterTotal), 0.0)
+-- Compute initial potential with perturbation added
 calcPotential(phi2d, f)
 runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
 phi2dSmoothed:sync()
 calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
-
--- Compute diagnostics for t = 0
---calcDiagnostics(0.0, 0.0)
---writeFields(0,0)
-
-
--- calculate free energy at time 0
-calcFreeEnergy(0.0, 0.0, f, tempFreeEnergy)
-W_0 = tempFreeEnergy:lastInsertedData()
-
-writeFields(0, 0.0)
+-- perform standard iteration to time tEnd
 Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
 dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
 Lucee.logInfo ("")
-writeFields(1, tEnd)
-
--- calculate free energy at time T
-calcFreeEnergy(0.0, 0.0, f, tempFreeEnergy)
-W_T = tempFreeEnergy:lastInsertedData()
--- calculate fAdjoint at time T
-f:scale(2/W_0)
--- Compute potential with perturbation added
-calcPotential(phi2d, f)
-runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
-phi2dSmoothed:sync()
-calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
-
--- calculate adjoint potential
-calcAdjointPotential(0.0, 0.0, f, adjointPotential)
-runUpdater(copy2dTo4d, 0.0, 0.0, {adjointPotential}, {adjointPotential4d})
-runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dSmoothed}, {phi4dSmoothed})
-
-tCurr = 0
--- step fAdjoint from time T to time 0
-for frame = 1, nFrames do
-  Lucee.logInfo (string.format("-- (Adjoint) Advancing solution from %g to %g", tCurr, tCurr+tFrame))
-  dtSuggested = advanceFrameAdjoint(tStart, tEnd, dtSuggested)
-  tCurr = tCurr+tFrame
-  calcDiagnostics(tCurr, tFrame)
-  writeFields(frame, tCurr)
-  Lucee.logInfo ("")
-end
-
--- calculate f at time 0
-f:scale(W_0*W_0/(2*W_T))
-
---calcDiagnostics(2*tEnd, 0.0)
---writeFields(2, 2*tEnd)
+freeEnergy:write( string.format("freeEnergy_%d.h5", iterTotal), tEnd)
