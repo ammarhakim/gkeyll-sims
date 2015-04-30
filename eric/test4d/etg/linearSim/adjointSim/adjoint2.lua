@@ -3,6 +3,7 @@
 -- 4-4-2015: Split original full-F simulation into a delta F simulation
 -- 4-10-2015: Added free energy calculation. Haven't debugged adjoint looping yet.
 -- 4-22-2015: More testing
+-- 4-25-2015: Starting with eigenmode
 
 -- polynomial order
 polyOrder = 1
