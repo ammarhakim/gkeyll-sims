@@ -11,9 +11,11 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-6
+tEnd = 1e-7
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTotal = 60
+iterTotal = 4
+nFrames = 40
+tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -142,8 +144,9 @@ function kineticTempProfile(x)
   return kineticTemp*(1 - (x-R)/L_T)
 end
 
-function perturbDensityProfile(x,y)
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+function perturbDensityProfile(x,y,v,mu)
+  return 1e-3*(vtKinetic/omega_s)/L_T*( math.cos(ky_min*y)
+  + 2/3*math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
 end
 
 function fProfile(x,y,v,mu)
@@ -171,7 +174,7 @@ initKineticFPerturb = Updater.EvalOnNodes4D {
    shareCommonNodes = false,
    -- function to use for initialization
    evaluate = function (x,y,v,mu,t)
-		 return perturbDensityProfile(x,y)
+		 return perturbDensityProfile(x,y,v,mu)
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
@@ -540,7 +543,7 @@ function calcTemperature(fIn, curr, dt, outputField)
 
   runUpdater(muCalc, curr, dt, {fFull, bField2d}, {muMoment})
   muMoment:scale(2*math.pi/kineticMass)
-  runUpdater(multi/p/gke/eshi/gkeyllall/gkeyll-sims/eric/test4d/etg/linearSim/adjointSimply2dCalc, curr, dt, {bField2d, muMoment}, {muMomentTimesB})
+  runUpdater(multiply2dCalc, curr, dt, {bField2d, muMoment}, {muMomentTimesB})
 
   runUpdater(vParaSqCalc, curr, dt, {fFull, bField2d}, {vParaSq})
   vParaSq:scale(2*math.pi/kineticMass)
@@ -615,7 +618,7 @@ function rk3adjoint(tCurr, myDt)
   local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   f1:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
-    {f1, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground}, {f1Intermediate})
+    {f1, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
   f1:accumulate(-myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -642,7 +645,7 @@ function rk3adjoint(tCurr, myDt)
   local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
-    {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground}, {f1Intermediate})
+    {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -670,7 +673,7 @@ function rk3adjoint(tCurr, myDt)
   local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
-    {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground}, {f1Intermediate})
+    {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -885,8 +888,10 @@ for iter = 0, iterTotal-1 do
   phi2dSmoothed:sync()
   calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
   -- calculate free energy at time 0
-  calcFreeEnergy(2*iter-1, 0.0, f, tempFreeEnergy)
-  W_0 = tempFreeEnergy:lastInsertedData()
+  if (iter == 0) then
+    calcFreeEnergy(2*iter-1, 0.0, f, tempFreeEnergy)
+    W_0 = tempFreeEnergy:lastInsertedData()
+  end
   calcDiagnostics(0.0, 0.0)
   -- write out initial number density data
   numDensityKineticPerturbed:write( string.format("n_%d.h5", iter), 0.0)
@@ -911,6 +916,16 @@ for iter = 0, iterTotal-1 do
   runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dSmoothed}, {phi4dSmoothed})
 
   Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tEnd, tStart))
+  
+  --tCurr = tStart
+  --for frame = 1, nFrames do
+  --  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
+  --  dtSuggested = advanceFrameAdjoint(tCurr, tCurr+tFrame, dtSuggested)
+  --  tCurr = tCurr+tFrame
+  --  writeFields(frame, tCurr)
+  --  Lucee.logInfo ("")
+  --end
+
   dtSuggested = advanceFrameAdjoint(tStart, tEnd, dtSuggested)
   Lucee.logInfo ("")
   
@@ -918,7 +933,7 @@ for iter = 0, iterTotal-1 do
   --f:scale(W_0*W_0/(2*W_T))
 
   -- net scaling
-  Lucee.logInfo (string.format("-- Scaled f by %g ", W_0/W_T))
+  --Lucee.logInfo (string.format("-- Scaled f by %g ", W_0/W_T))
 end
 
 -- final iteration to compute amplification
