@@ -3,6 +3,7 @@
 -- 4-4-2015: Split original full-F simulation into a delta F simulation
 -- 4-10-2015: Added free energy calculation. Haven't debugged adjoint looping yet.
 -- 4-22-2015: More testing
+-- 4-30-2015: Random initial conditions, removing cos component
 
 -- polynomial order
 polyOrder = 1
@@ -145,7 +146,7 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y,v,mu)
-  return 2*math.random()1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  return (2*math.random()-1)*1e-3*(vtKinetic/omega_s)/L_T
 end
 
 function fProfile(x,y,v,mu)
