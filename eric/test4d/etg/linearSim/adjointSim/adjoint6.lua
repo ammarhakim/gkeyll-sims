@@ -3,8 +3,8 @@
 -- 4-4-2015: Split original full-F simulation into a delta F simulation
 -- 4-10-2015: Added free energy calculation. Haven't debugged adjoint looping yet.
 -- 4-22-2015: More testing
--- 4-30-2015: Random initial conditions, removing cos component
--- 5-1-2015: Same as adjoint4, but another random seed
+-- 4-25-2015: Starting with eigenmode
+-- 5-1-2015: possibly another guess at eigenmode
 
 -- polynomial order
 polyOrder = 1
@@ -15,7 +15,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 1e-7
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTotal = 25
+iterTotal = 40
 nFrames = 40
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
@@ -147,7 +147,8 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y,v,mu)
-  return (2*math.random()-1)*1e-3*(vtKinetic/omega_s)/L_T
+  return 1e-3*(vtKinetic/omega_s)/L_T*( math.cos(ky_min*y)
+  + math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
 end
 
 function fProfile(x,y,v,mu)
