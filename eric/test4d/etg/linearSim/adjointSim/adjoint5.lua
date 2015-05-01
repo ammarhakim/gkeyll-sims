@@ -146,7 +146,7 @@ function kineticTempProfile(x)
   return kineticTemp*(1 - (x-R)/L_T)
 end
 
-math.randomseed( os.time() )
+math.randomseed(1234)
 
 function perturbDensityProfile(x,y,v,mu)
   return (2*math.random()-1)*1e-3*(vtKinetic/omega_s)/L_T
