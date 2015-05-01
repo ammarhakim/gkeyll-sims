@@ -14,7 +14,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 1e-7
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTotal = 40
+iterTotal = 4
 nFrames = 40
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
