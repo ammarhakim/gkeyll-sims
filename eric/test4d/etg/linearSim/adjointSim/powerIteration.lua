@@ -4,6 +4,7 @@
 -- 4-10-2015: Added free energy calculation. Haven't debugged adjoint looping yet.
 -- 4-22-2015: More testing
 -- 4-24-2015: "Power Iteration"
+-- 5-1-2015: "damped eigenmode"
 
 -- polynomial order
 polyOrder = 1
