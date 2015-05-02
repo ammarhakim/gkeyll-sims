@@ -15,7 +15,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 1e-7
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTotal = 40
+iterTotal = 25
 nFrames = 40
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
@@ -148,7 +148,7 @@ end
 
 function perturbDensityProfile(x,y,v,mu)
   return 1e-3*(vtKinetic/omega_s)/L_T*( math.cos(ky_min*y)
-  + math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
+  - math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
 end
 
 function fProfile(x,y,v,mu)
