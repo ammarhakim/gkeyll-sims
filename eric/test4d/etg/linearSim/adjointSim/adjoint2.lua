@@ -937,7 +937,7 @@ for iter = 0, iterTotal-1 do
   -- Renomalization step
   calcFreeEnergy(2*iter+1, 0.0, f, tempFreeEnergy)
   W_T = tempFreeEnergy:lastInsertedData()
-  f:scale(W_0/W_T)
+  f:scale(math.sqrt(W_0/W_T))
 
   -- net scaling
   --Lucee.logInfo (string.format("-- Scaled f by %g ", W_0/W_T))
