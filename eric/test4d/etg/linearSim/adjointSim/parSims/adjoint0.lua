@@ -183,8 +183,9 @@ function kineticTempProfile(x)
   return kineticTemp*(1 - (x-R)/L_T)
 end
 
-function perturbDensityProfile(x,y)
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+function perturbDensityProfile(x,y,v,mu)
+  return 1e-3*(vtKinetic/omega_s)/L_T*( math.cos(ky_min*y)
+  - 2/3*math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
 end
 
 function fProfile(x,y,v,mu)
@@ -212,7 +213,7 @@ initKineticFPerturb = Updater.EvalOnNodes4D {
    shareCommonNodes = false,
    -- function to use for initialization
    evaluate = function (x,y,v,mu,t)
-		 return perturbDensityProfile(x,y)
+		 return perturbDensityProfile(x,y,v,mu)
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
