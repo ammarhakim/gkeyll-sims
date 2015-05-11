@@ -5,6 +5,7 @@
 -- 4-23-2015: parallel version
 -- 5-1-2015: debugged known issues so far
 -- 5-11-2015: same as adjoint0.lua, but with different decomposition
+-- 5-11-2015: doubled position space resolution
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
@@ -46,8 +47,8 @@ deltaR    = 32*rho_s
 L_T       = R/4
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 8
-N_Y = 8
+N_X = 16
+N_Y = 16
 N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent

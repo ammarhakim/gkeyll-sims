@@ -36,7 +36,7 @@ for idx in range(1,filenumEnd+1):
   plt.semilogx(timeVals, dataVals[:,2],'k')
 
 plt.ylim(0, 6e9)
-plt.xlim(1, 2)
+plt.xlim(0.5, 350)
 plt.legend(['Total','Ions','Electrons'],loc='upper left')
 plt.xlabel(r'time ($\mu$s)')
 plt.ylabel(r'Q (W/m$^2$)')
