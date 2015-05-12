@@ -6,9 +6,10 @@
 -- 4-23-2015: parallel version
 -- 5-1-2015: debugged known issues so far
 -- 5-2-2015: power iteration at high res in parallel
+-- 5-12-2015: gaussian in x and y initial condition
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -187,8 +188,11 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y,v,mu)
-  return 1e-3*(vtKinetic/omega_s)/L_T*( math.cos(ky_min*y)
-  - 2/3*math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
+  --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  local x0 = (X_LOWER+X_UPPER)/2
+  local y0 = (Y_LOWER+Y_UPPER)/2
+  local sigma = deltaR/4
+  return 1e-3*(vtKinetic/omega_s)/L_T*math.exp(-(y-y0)^2/(2*sigma^2))*math.exp(-(x-x0)^2/(2*sigma^2))
 end
 
 function fProfile(x,y,v,mu)
