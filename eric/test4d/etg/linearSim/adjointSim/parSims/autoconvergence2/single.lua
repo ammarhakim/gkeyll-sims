@@ -6,6 +6,7 @@
 -- 5-1-2015: debugged known issues so far
 -- 5-11-2015: same as adjoint0.lua, but with different decomposition
 -- 5-11-2015: gaussian perturbation
+-- 5-14-2015: only one forward iteration to track free energy
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
@@ -21,7 +22,7 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-7
+tEnd = 20e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 iterTotal = 1
 
@@ -44,11 +45,11 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/4
+L_T       = R/2
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 8
-N_Y = 8
+N_X = 16
+N_Y = 16
 N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
@@ -972,56 +973,8 @@ f:copy(fNew)
 -- Apply boundary conditions
 f:sync()
 
--- Adjoint iteration
-for iter = 0, iterTotal-1 do
-  Lucee.logInfo (string.format("-- Iteration %g --", iter+1))
-  -- Compute initial potential with perturbation added
-  calcPotential(phi2d, f)
-  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
-  phi2dSmoothed:sync()
-  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
-  -- calculate free energy at time 0
-  if (iter == 0) then
-    calcFreeEnergy(2*iter, 0.0, f, tempFreeEnergy)
-    W_0 = tempFreeEnergy:lastInsertedData()
-  end
-  calcDiagnostics(0.0, 0.0)
-  -- write out initial number density data
-  numDensityKineticPerturbed:write( string.format("n_%d.h5", iter), 0.0)
-  -- perform standard iteration to time tEnd
-  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
-  dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
-  Lucee.logInfo ("")
-  freeEnergy:write( string.format("freeEnergy_%d.h5", iter), tEnd)
-  
-  -- recompute initial potential and hamiltonian with scaled f
-  calcPotential(phi2d, f)
-  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
-  phi2dSmoothed:sync()
-  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
-  -- calculate initial adjoint potential
-  calcAdjointPotential(0.0, 0.0, f, adjointPotential)
-  runUpdater(copy2dTo4d, 0.0, 0.0, {adjointPotential}, {adjointPotential4d})
-  runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dSmoothed}, {phi4dSmoothed})
-  adjointPotential4d:sync()
-  phi4dSmoothed:sync()
-
-  Lucee.logInfo (string.format("-- (Adjoint) Advancing solution from %g to %g", tEnd, tStart))
-  dtSuggested = advanceFrameAdjoint(tStart, tEnd, dtSuggested)
-  Lucee.logInfo ("")
-  
-  calcFreeEnergy(2*iter+1, 0.0, f, tempFreeEnergy)
-  W_T = tempFreeEnergy:lastInsertedData()
-  -- calculate f at time 0
-  f:scale(math.sqrt(W_0/W_T))
-end
-
 -- final iteration to compute amplification
 calcDiagnostics(0.0, 0.0)
--- write out final iteration fields
-f:write( string.format("f_%d.h5", 0), 0.0)
-numDensityKineticPerturbed:write( string.format("n_%d.h5", iterTotal), 0.0)
-kineticTempField:write( string.format("kineticTemp_%d.h5", iterTotal), 0.0)
 -- Compute initial potential with perturbation added
 calcPotential(phi2d, f)
 runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
