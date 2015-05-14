@@ -24,7 +24,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 1e-7
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTotal = 1
+iterTotal = 20
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
