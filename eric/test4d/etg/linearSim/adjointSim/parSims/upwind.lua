@@ -60,7 +60,7 @@ Y_UPPER = deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/B0
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -295,7 +295,7 @@ gyroEqn = PoissonBracketEquation.GyroEquation4D {
   bStarY = bStarYField,
 }
 -- This one takes dF and H0
-pbSlvrOne = Updater.PoissonBracketOpt4D {
+pbSlvr = Updater.PoissonBracketOpt4D {
    onGrid = grid_4d,
    -- basis functions to use
    basis = basis_4d,
@@ -309,57 +309,6 @@ pbSlvrOne = Updater.PoissonBracketOpt4D {
    zeroFluxDirections = {2,3},
    onlyIncrement = true,
    fluxType = "upwind",
-}
-
--- This one takes F0 and dH
-pbSlvrTwo = Updater.PoissonBracketOpt4D {
-   onGrid = grid_4d,
-   -- basis functions to use
-   basis = basis_4d,
-   -- CFL number
-   cfl = cfl,
-   -- equation to solve
-   equation = gyroEqn,
-   -- let solver know about additional jacobian factor
-   jacobianField = jacobianField,
-   updateDirections = {0,1,2},
-   zeroFluxDirections = {2,3},
-   onlyIncrement = true,
-   fluxType = "upwind"
-}
-
--- This one takes dF and H0
-pbSlvrOneReverse = Updater.PoissonBracketOpt4D {
-   onGrid = grid_4d,
-   -- basis functions to use
-   basis = basis_4d,
-   -- CFL number
-   cfl = cfl,
-   -- equation to solve
-   equation = gyroEqn,
-   -- let solver know about additional jacobian factor
-   jacobianField = jacobianField,
-   updateDirections = {0,1,2},
-   zeroFluxDirections = {2,3},
-   onlyIncrement = true,
-   fluxType = "downwind",
-}
-
--- This one takes F0 and dH
-pbSlvrTwoReverse = Updater.PoissonBracketOpt4D {
-   onGrid = grid_4d,
-   -- basis functions to use
-   basis = basis_4d,
-   -- CFL number
-   cfl = cfl,
-   -- equation to solve
-   equation = gyroEqn,
-   -- let solver know about additional jacobian factor
-   jacobianField = jacobianField,
-   updateDirections = {0,1,2},
-   zeroFluxDirections = {2,3},
-   onlyIncrement = true,
-   fluxType = "downwind"
 }
 
 -- Perturbed Hamiltonian
@@ -736,9 +685,9 @@ end
 function rk3adjoint(tCurr, myDt)
   -- RK stage 1
   f1:copy(f)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOneReverse, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
   f1:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwoReverse, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   f1:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {f1, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -764,9 +713,9 @@ function rk3adjoint(tCurr, myDt)
 
   -- RK stage 2
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOneReverse, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwoReverse, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -794,9 +743,9 @@ function rk3adjoint(tCurr, myDt)
 
   -- RK stage 3
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOneReverse, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwoReverse, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -831,9 +780,9 @@ end
 function rk3(tCurr, myDt)
   -- RK stage 1
   f1:copy(f)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
   f1:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   f1:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -850,9 +799,9 @@ function rk3(tCurr, myDt)
 
   -- RK stage 2
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -871,9 +820,9 @@ function rk3(tCurr, myDt)
 
   -- RK stage 3
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
