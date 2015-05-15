@@ -742,7 +742,7 @@ function rk3adjoint(tCurr, myDt)
   f1:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {f1, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
-  f1:accumulate(-myDt, f1Intermediate)
+  --f1:accumulate(-myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
     return false, math.min(myDtSuggestedOne, myDtSuggestedTwo)
@@ -770,7 +770,7 @@ function rk3adjoint(tCurr, myDt)
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
-  fNew:accumulate(-myDt, f1Intermediate)
+  --fNew:accumulate(-myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
     return false, math.min(myDtSuggestedOne, myDtSuggestedTwo)
@@ -800,7 +800,7 @@ function rk3adjoint(tCurr, myDt)
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
-  fNew:accumulate(-myDt, f1Intermediate)
+  --fNew:accumulate(-myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
     return false, math.min(myDtSuggestedOne, myDtSuggestedTwo)
