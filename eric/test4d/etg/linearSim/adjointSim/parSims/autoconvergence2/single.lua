@@ -45,7 +45,7 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/2
+L_T       = R/1.5
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 16
