@@ -4,9 +4,9 @@
 -- 4-22-2015: More testing
 -- 4-23-2015: parallel version
 -- 5-1-2015: debugged known issues so far
--- 5-11-2015: same as adjoint3.lua, but with different decomposition
--- 5-11-2015: cos perturbation with 2x k
--- 5-14-2015: lua code to determine iteration count based on accuracy
+-- 5-11-2015: same as adjoint0.lua, but with different decomposition
+-- 5-14-2015: doubled velocity space resolution but kept position space resolution "low"
+-- 5-14-2015: instatneous optimal at double k
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
@@ -22,9 +22,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-6
+tEnd = 1e-7
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTol = 0.0001 -- desired tolerance for convergence
+iterTotal = 20
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -45,12 +45,12 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/2
+L_T       = R/4
 ky_min    = 2*2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 16
-N_Y = 16
-N_VPARA = 8
+N_X = 8
+N_Y = 8
+N_VPARA = 16
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
@@ -187,11 +187,8 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y,v,mu)
-  --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
-  local x0 = (X_LOWER+X_UPPER)/2
-  local y0 = (Y_LOWER+Y_UPPER)/2
-  local sigma = deltaR/4
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.exp(-(y-y0)^2/(2*sigma^2))*math.exp(-(x-x0)^2/(2*sigma^2))
+  return 1e-3*(vtKinetic/omega_s)/L_T*( math.cos(ky_min*y)
+  - 2/3*math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
 end
 
 function fProfile(x,y,v,mu)
@@ -295,7 +292,7 @@ gyroEqn = PoissonBracketEquation.GyroEquation4D {
   bStarY = bStarYField,
 }
 -- This one takes dF and H0
-pbSlvr = Updater.PoissonBracketOpt4D {
+pbSlvrOne = Updater.PoissonBracketOpt4D {
    onGrid = grid_4d,
    -- basis functions to use
    basis = basis_4d,
@@ -308,7 +305,24 @@ pbSlvr = Updater.PoissonBracketOpt4D {
    updateDirections = {0,1,2},
    zeroFluxDirections = {2,3},
    onlyIncrement = true,
-   fluxType = "upwind",
+   fluxType = "central",
+}
+
+-- This one takes F0 and dH
+pbSlvrTwo = Updater.PoissonBracketOpt4D {
+   onGrid = grid_4d,
+   -- basis functions to use
+   basis = basis_4d,
+   -- CFL number
+   cfl = cfl,
+   -- equation to solve
+   equation = gyroEqn,
+   -- let solver know about additional jacobian factor
+   jacobianField = jacobianField,
+   updateDirections = {0,1,2},
+   zeroFluxDirections = {2,3},
+   onlyIncrement = true,
+   fluxType = "central"
 }
 
 -- Perturbed Hamiltonian
@@ -685,9 +699,9 @@ end
 function rk3adjoint(tCurr, myDt)
   -- RK stage 1
   f1:copy(f)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
   f1:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   f1:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {f1, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -713,9 +727,9 @@ function rk3adjoint(tCurr, myDt)
 
   -- RK stage 2
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -743,9 +757,9 @@ function rk3adjoint(tCurr, myDt)
 
   -- RK stage 3
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -780,9 +794,9 @@ end
 function rk3(tCurr, myDt)
   -- RK stage 1
   f1:copy(f)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
   f1:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   f1:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -799,9 +813,9 @@ function rk3(tCurr, myDt)
 
   -- RK stage 2
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -820,9 +834,9 @@ function rk3(tCurr, myDt)
 
   -- RK stage 3
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -906,12 +920,12 @@ function advanceFrameAdjoint(tStart, tEnd, initDt)
       myDt = tEnd-tCurr
     end
 
-    Lucee.logInfo (string.format("Taking step %d at time %g with dt %g", step, tCurr, myDt))
+    Lucee.logInfo (string.format("(Adjoint) Taking step %d at time %g with dt %g", step, tCurr, myDt))
     status, dtSuggested = rk3adjoint(tCurr, myDt)
 
     if (status == false) then
       -- time-step too large
-      Lucee.logInfo (string.format("** Time step %g too large! Will retake with dt %g", myDt, dtSuggested))
+      Lucee.logInfo (string.format("(Adjoint) ** Time step %g too large! Will retake with dt %g", myDt, dtSuggested))
       -- Revert fields to previous value
       f:copy(fNewDup)
       hamilPerturbed:copy(hamilDup)
@@ -955,28 +969,28 @@ runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
 f:copy(fNew)
 -- Apply boundary conditions
 f:sync()
--- Copy to fInitialPetrub again
-fInitialPerturb:copy(f)
 
--- function to take one complete step of adjoint algorithm
-function adjointSingleIteration(currIter, tEndIter)
+-- Adjoint iteration
+for iter = 0, iterTotal-1 do
+  Lucee.logInfo (string.format("-- Iteration %g --", iter+1))
   -- Compute initial potential with perturbation added
   calcPotential(phi2d, f)
   runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
   phi2dSmoothed:sync()
   calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
   -- calculate free energy at time 0
-  if (currIter == 0) then
-    calcFreeEnergy(2*currIter, 0.0, f, tempFreeEnergy)
+  if (iter == 0) then
+    calcFreeEnergy(2*iter, 0.0, f, tempFreeEnergy)
     W_0 = tempFreeEnergy:lastInsertedData()
   end
   calcDiagnostics(0.0, 0.0)
-  -- perform standard iteration to time tEndIter
-  Lucee.logInfo (string.format("--Iteration %g: Advancing solution from %g to %g", currIter, tStart, tEndIter))
-  dtSuggested = advanceFrame(tStart, tEndIter, dtSuggested)
+  -- write out initial number density data
+  numDensityKineticPerturbed:write( string.format("n_%d.h5", iter), 0.0)
+  -- perform standard iteration to time tEnd
+  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
+  dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
   Lucee.logInfo ("")
-  W_T_PREV = W_T
-  W_T = freeEnergy:lastInsertedData()
+  freeEnergy:write( string.format("freeEnergy_%d.h5", iter), tEnd)
   
   -- recompute initial potential and hamiltonian with scaled f
   calcPotential(phi2d, f)
@@ -990,55 +1004,29 @@ function adjointSingleIteration(currIter, tEndIter)
   adjointPotential4d:sync()
   phi4dSmoothed:sync()
 
-  Lucee.logInfo (string.format("--Iteration %g: (Adjoint) Advancing solution from %g to %g", currIter, tEndIter, tStart))
-  dtSuggested = advanceFrameAdjoint(tStart, tEndIter, dtSuggested)
+  Lucee.logInfo (string.format("-- (Adjoint) Advancing solution from %g to %g", tEnd, tStart))
+  dtSuggested = advanceFrameAdjoint(tStart, tEnd, dtSuggested)
   Lucee.logInfo ("")
   
-  calcFreeEnergy(2*currIter+1, 0.0, f, tempFreeEnergy)
-  W_0_NEW = tempFreeEnergy:lastInsertedData()
+  calcFreeEnergy(2*iter+1, 0.0, f, tempFreeEnergy)
+  W_T = tempFreeEnergy:lastInsertedData()
   -- calculate f at time 0
-  f:scale(math.sqrt(W_0/W_0_NEW))
-  
-  -- check for convergence
-  if currIter == 0 or math.abs((W_T-W_T_PREV)/W_T_PREV) > iterTol then
-    if currIter ~= 0 then
-      Lucee.logInfo (string.format("-- Convergence factor = %g", math.abs((W_T-W_T_PREV)/W_T_PREV)))
-    end
-    return false
-  else
-    return true
-  end
+  f:scale(math.sqrt(W_0/W_T))
 end
 
-timePoints = 5 -- number of points to optimize free energy growth
--- build array of times to optimize free energy growth
-tEndArray = {}
-for i = 1,timePoints do
-  tEndArray[i] = i*tEnd/timePoints
-end
-
-for i,tEndVal in ipairs(tEndArray) do
-
-  iterCounter = 0
-  repeat
-    convergenceStatus = adjointSingleIteration(iterCounter, tEndVal)
-    -- need to write to temporary file to clear freeEnergy dynvector
-    freeEnergy:write( string.format("freeEnergy.h5"), tEndVal)
-    --freeEnergy:write( string.format("freeEnergy_%d.h5", iterCounter), tEndVal)
-    iterCounter = iterCounter + 1
-  until convergenceStatus == true
-  -- final iteration to write out a free energy vs time curve for optimized curve
-  calcDiagnostics(0.0, 0.0)
-  calcPotential(phi2d, f)
-  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
-  phi2dSmoothed:sync()
-  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
-  -- perform standard iteration to time tEnd
-  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
-  dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
-  Lucee.logInfo ("")
-  freeEnergy:write( string.format("freeEnergy_%d.h5", i-1), tEnd)
-
-  -- Revert f to initial condition before any iterations
-  f:copy(fInitialPerturb)
-end
+-- final iteration to compute amplification
+calcDiagnostics(0.0, 0.0)
+-- write out final iteration fields
+f:write( string.format("f_%d.h5", 0), 0.0)
+numDensityKineticPerturbed:write( string.format("n_%d.h5", iterTotal), 0.0)
+kineticTempField:write( string.format("kineticTemp_%d.h5", iterTotal), 0.0)
+-- Compute initial potential with perturbation added
+calcPotential(phi2d, f)
+runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
+phi2dSmoothed:sync()
+calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
+-- perform standard iteration to time tEnd
+Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
+dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
+Lucee.logInfo ("")
+freeEnergy:write( string.format("freeEnergy_%d.h5", iterTotal), tEnd)
