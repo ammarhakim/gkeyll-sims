@@ -9,7 +9,7 @@
 -- 5-14-2015: only one forward iteration to track free energy
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
