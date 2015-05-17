@@ -116,9 +116,8 @@ basisIon = NodalFiniteElement3D.SerendipityElement {
    polyOrder = polyOrder,
 }
 
-
 -- spatial FEM nodal basis
-basis_1d = NodalFiniteElement1D.LagrangeTensor {
+basis_1d = NodalFiniteElement1D.SerendipityElement {
    onGrid = grid_1d,
    polyOrder = polyOrder,
 }
@@ -191,67 +190,71 @@ mom2Ion = DataStruct.Field1D {
 }
 
 -- Updater to compute electron number density
-mom0CalcElc = Updater.DistFuncMomentCalc1D {
+mom0CalcElc = Updater.DistFuncMomentCalc1DFrom3D {
    onGrid = gridElc,
-   basis2d = basisElc,
+   basis3d = basisElc,
    basis1d = basis_1d,
    moment = 0,
 }
-mom0CalcIon = Updater.DistFuncMomentCalc1D {
+mom0CalcIon = Updater.DistFuncMomentCalc1DFrom3D {
    onGrid = gridIon,
-   basis2d = basisIon,
+   basis3d = basisIon,
    basis1d = basis_1d,
    moment = 0,
 }
 
 -- Updater to compute electron momentum
-mom1CalcElc = Updater.DistFuncMomentCalc1D {
+mom1CalcElc = Updater.DistFuncMomentCalc1DFrom3D {
    onGrid = gridElc,
-   basis2d = basisElc,
+   basis3d = basisElc,
    basis1d = basis_1d,
    moment = 1,
+   momentDirection = 1,
 }
-mom1CalcIon = Updater.DistFuncMomentCalc1D {
+mom1CalcIon = Updater.DistFuncMomentCalc1DFrom3D {
    onGrid = gridIon,
-   basis2d = basisIon,
+   basis3d = basisIon,
    basis1d = basis_1d,
    moment = 1,
+   momentDirection = 1,
 }
 
 -- Updater to compute electron energy
-mom2CalcElc = Updater.DistFuncMomentCalc1D {
+mom2CalcElc = Updater.DistFuncMomentCalc1DFrom3D {
    onGrid = gridElc,
-   basis2d = basisElc,
+   basis3d = basisElc,
    basis1d = basis_1d,
    moment = 2,
+   momentDirection = 1,
 }
-mom2CalcIon = Updater.DistFuncMomentCalc1D {
+mom2CalcIon = Updater.DistFuncMomentCalc1DFrom3D {
    onGrid = gridIon,
-   basis2d = basisIon,
+   basis3d = basisIon,
    basis1d = basis_1d,
    moment = 2,
+   momentDirection = 1,
 }
 
--- Maxwellian with number density 'n0', species mass 'mass' and
--- thermal speed 'vt' = \sqrt{T/m}, where T and m are species
--- temperature and mass respectively.
-function maxwellian(n0, mass, vt, p)
-   return n0/math.sqrt(2*Lucee.Pi*vt^2)*math.exp(-p^2/(2*mass^2*vt^2))
+function maxwellian(mass, vt, vPara, mu)
+  return 1/(2*Lucee.Pi*vt^2)^(3/2)*math.exp(-vPara^2/(2*vt^2))*
+    math.exp(-2*mu*B0/(mass*vt^2))
 end
 
 -- Maxwellian (Right half only)
-function maxwellianRight(n0, mass, vt, p)
-  if p>=0 then
-    return n0/math.sqrt(2*Lucee.Pi*vt^2)*math.exp(-p^2/(2*mass^2*vt^2))
+function maxwellianRight(mass, vt, vPara, mu)
+  if vPara >=0 then
+    return 1/(2*Lucee.Pi*vt^2)^(3/2)*math.exp(-vPara^2/(2*vt^2))*
+      math.exp(-2*mu*B0/(mass*vt^2))
   else
     return 0
   end
 end
 
 -- Maxwellian (Left half only)
-function maxwellianLeft(n0, mass, vt, p)
-  if p <= 0 then
-    return n0/math.sqrt(2*Lucee.Pi*vt^2)*math.exp(-p^2/(2*mass^2*vt^2))
+function maxwellianLeft(mass, vt, vPara, mu)
+  if vPara <= 0 then
+    return 1/(2*Lucee.Pi*vt^2)^(3/2)*math.exp(-vPara^2/(2*vt^2))*
+      math.exp(-2*mu*B0/(mass*vt^2))
   else
     return 0
   end
@@ -282,16 +285,16 @@ function initialIonTemp(x)
 end
 
 -- updater to initialize distribution function
-initDistfElc = Updater.ProjectOnNodalBasis2D {
+initDistfElc = Updater.ProjectOnNodalBasis3D {
    onGrid = gridElc,
    -- basis functions to use
    basis = basisElc,
    -- are common nodes shared?
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
-   evaluate = function(x,y,z,t)
+   evaluate = function(z,vPara,mu,t)
      local vTe = math.sqrt(initialElectronTemp(x)*eV/elcMass)
-     return maxwellian(initialElcDens(x), elcMass, vTe, y)
+     return initialElcDens(z)*maxwellian(elcMass, vTe, vPara, mu)
 	 end
 }
 runUpdater(initDistfElc, 0.0, 0.0, {}, {distfElc})
@@ -306,18 +309,19 @@ initDistfIon = Updater.ProjectOnNodalBasis2D {
    -- are common nodes shared?
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
-   evaluate = function(x,y,z,t)
-     local backgroundTemp = initialIonTemp(x)
+   evaluate = function(z,vPara,mu,t)
+     local backgroundTemp = initialIonTemp(z)
      local nHat = 2
      local vTi = math.sqrt(2*math.pi/(math.pi-1)*backgroundTemp*eV/ionMass)
 
-     if x > lSource/2 then
-       return maxwellianRight(nHat, ionMass, vTi, y)
-     elseif x < -lSource/2 then
-       return maxwellianLeft(nHat, ionMass, vTi, y)
+     if z > lSource/2 then
+       return nHat*maxwellianRight(ionMass, vTi, vPara, mu)
+     elseif z < -lSource/2 then
+       return nHat*maxwellianLeft(ionMass, vTi, vPara, mu)
      else
        -- Must be between the source boundaries, use a linear combo.
-       return ((lSource/2 + x)*maxwellianRight(nHat, ionMass, vTi, y) + (lSource/2 - x)*maxwellianLeft(nHat, ionMass, vTi, y))/lSource
+       return ((lSource/2 + z)*nHat*maxwellianRight(ionMass, vTi, vPara, mu) + 
+          (lSource/2 - z)*nHat*maxwellianLeft(ionMass, vTi, vPara, mu))/lSource
      end
 	 end
 }

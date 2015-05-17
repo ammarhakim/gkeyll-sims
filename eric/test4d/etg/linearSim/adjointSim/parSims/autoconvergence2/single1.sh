@@ -1,5 +1,5 @@
 #!/bin/bash 
-#PBS -N auto-adj-2-two
+#PBS -N auto-adj-2-one
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
@@ -11,7 +11,7 @@
 #PBS -j oe 
 NPROCS=`wc -l < $PBS_NODEFILE`
 
-CMD="/p/gke/eshi/gkeyllall/par-opt/gkeyll/gkeyll -i single1.lua -pc_type lu" 
+CMD="/p/gke/eshi/gkeyllall/par-opt/gkeyll/gkeyll -i single.lua -pc_type lu" 
 cd $PBS_O_WORKDIR 
 mpiexec -np $NPROCS $CMD 
 exit
