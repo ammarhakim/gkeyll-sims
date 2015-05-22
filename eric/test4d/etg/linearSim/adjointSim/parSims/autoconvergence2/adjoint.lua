@@ -9,7 +9,7 @@
 -- 5-14-2015: lua code to determine iteration count based on accuracy
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 4, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -48,9 +48,9 @@ deltaR    = 32*rho_s
 L_T       = R/2
 ky_min    = 2*2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 16
-N_Y = 16
-N_VPARA = 8
+N_X = 8
+N_Y = 8
+N_VPARA = 16
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
