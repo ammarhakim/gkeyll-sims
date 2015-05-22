@@ -44,8 +44,6 @@ A = 1.2
 -- Magnetic field (Tesla)
 B0 = 2
 
-mu0 = Lucee.Mu0
-
 -- Derived parameters
 -- Ion cyclotron frequency
 Omega_i = Lucee.ElementaryCharge*B0/ionMass
@@ -63,7 +61,7 @@ cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
 Sn   = A*nPed*cPed/lSource
 -- number of cells
-N_Z, N_VPARA, N_MU = 8, 32, 16
+N_Z, N_VPARA, N_MU = 8, 16, 8
 -- domain extents
 Z_LOWER, Z_UPPER = -lParallel, lParallel
 -- electron velocity extents
@@ -272,14 +270,14 @@ mom1MuCalcIon = Updater.DistFuncMomentCalc1DFrom3D {
 }
 
 function maxwellian(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/ionMass)
+  local vtPerp = math.sqrt(tPed*eV/mass)
   return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
     math.exp(-mu*B0/(tPed*eV))
 end
 
 -- Maxwellian (Right half only)
 function maxwellianRight(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/ionMass)
+  local vtPerp = math.sqrt(tPed*eV/mass)
   if vPara >=0 then
     return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
       math.exp(-mu*B0/(tPed*eV))
@@ -290,7 +288,7 @@ end
 
 -- Maxwellian (Left half only)
 function maxwellianLeft(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/ionMass)
+  local vtPerp = math.sqrt(tPed*eV/mass)
   if vPara <= 0 then
     return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
       math.exp(-mu*B0/(tPed*eV))
@@ -373,7 +371,13 @@ initIonDensityCalc = Updater.SOLIonDensityInitialization {
 }
 runUpdater(initIonDensityCalc, 0.0, 0.0, {numDensityElc}, {numDensityIon})
 
--- Copy numDensityIon to a 3d field
+-- Copy numDensityIon and numDensityElc to a 3d field
+copyTo3DElcDg = Updater.NodalCopy1DTo3DFieldUpdater {
+  onGrid = gridElc,
+  basis1d = basis_1d,
+  basis3d = basisElc,
+  polyOrder = polyOrder,
+}
 copyTo3DIonDg = Updater.NodalCopy1DTo3DFieldUpdater {
   onGrid = gridIon,
   basis1d = basis_1d,
@@ -663,7 +667,7 @@ function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
    hamilOut:clear(0.0)
 
    -- Accumulate q*Phi contribution to hamiltonian
-   runUpdater(copyTo3DElcDg, curr, dt, {phiIn}, {hamilOut})
+   runUpdater(copyTo3DElcDg, curr, dt, {phiDgIn}, {hamilOut})
    hamilOut:scale(elcCharge)
 
    -- Accumulate the KE hamiltonian to the full hamiltonian
@@ -671,22 +675,22 @@ function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
 end
 
 -- to compute second order hamiltonian term
-mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
-  onGrid = grid_1d,
-  basis = basis_1d,
-}
+--mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
+--  onGrid = grid_1d,
+--  basis = basis_1d,
+--}
 -- store result of mhdHamiltonianCalc
-mhdHamiltonian1dDg = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numNodes(),
-   ghost = {1, 1},
-}
+--mhdHamiltonian1dDg = DataStruct.Field1D {
+--   onGrid = grid_1d,
+--   numComponents = basis_1d:numNodes(),
+--   ghost = {1, 1},
+--}
 -- result of mhdHamiltonianCalc as continuous field
-mhdHamiltonian1d = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numExclusiveNodes(),
-   ghost = {1, 1},
-}
+--mhdHamiltonian1d = DataStruct.Field1D {
+--   onGrid = grid_1d,
+--   numComponents = basis_1d:numExclusiveNodes(),
+--   ghost = {1, 1},
+--}
 --mhdHamiltonian2d = DataStruct.Field3D {
 --   onGrid = gridIon,
 --   numComponents = basisIon:numExclusiveNodes(),
@@ -698,7 +702,7 @@ mhdHamiltonian1d = DataStruct.Field1D {
 --   ghost = {1, 1},
 --}
 -- stores mhd hamiltonian contribution to total energy
-mhdHamiltonianEnergy = DataStruct.DynVector { numComponents = 1, }
+--mhdHamiltonianEnergy = DataStruct.DynVector { numComponents = 1, }
 
 -- compute hamiltonian for electrons
 function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
@@ -748,13 +752,13 @@ bcConst = BoundaryCondition.Const {
 }
 
 function makeBcObjIon()
-   local bcLower = Updater.Bc2D {
+   local bcLower = Updater.Bc3D {
       onGrid = gridIon,
       boundaryConditions = {bcConst},
       dir = 0,
       edge = "lower",
    }
-   local bcUpper = Updater.Bc2D {
+   local bcUpper = Updater.Bc3D {
       onGrid = gridIon,
       boundaryConditions = {bcConst},
       dir = 0,
@@ -766,34 +770,29 @@ end
 -- make objects to apply BCs
 bcLowerIon, bcUpperIon = makeBcObjIon()
 
-print('hello')
 -- updater to apply boundary condition on distribution function
 reflectingBc = Updater.SOL3DElectrostaticDistFuncReflectionBc {
    onGrid = gridElc,
    basis = basisElc,
+   basis1d = basis_1d,
    edge = "both",
-   -- physical parameters
-   elcCharge = elcCharge,
-   ionCharge = ionCharge,
-   elcMass = elcMass,
-   ionMass = ionMass,
+   scaleFactor = 2*math.pi*B0/elcMass,
 }
-
 
 -- apply boundary conditions
 function applyBc(curr, dt, fldElc, fldIon, cutoffV)
   runUpdater(bcLowerIon, curr, dt, {}, {fldIon})
   runUpdater(bcUpperIon, curr, dt, {}, {fldIon})
   -- Use reflecting BC for the electrons
-  runUpdater(reflectingBc, curr, dt, {mom0Ion, mom1Ion}, {fldElc, cutoffV})
+  runUpdater(reflectingBc, curr, dt, {mom1ParaIon}, {fldElc, cutoffV})
   -- (zero flux bc's applied via poisson updater)
 end
 
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
    -- compute moments at edges
-   runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilKeElcDg}, {momentsAtEdgesElc})
-   runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon, hamilKeIonDg}, {momentsAtEdgesIon})
+   runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilElcKeDg}, {momentsAtEdgesElc})
+   runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon, hamilIonKeDg}, {momentsAtEdgesIon})
    -- modify phi so that is is equal to phi_s at edge
    -- TODO: change it so it takes phi1dDg as input instead of phi1d
    runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
@@ -806,7 +805,7 @@ function calcDiagnostics(curr, dt)
    -- compute heat flux at edges
    runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
     momentsAtEdgesIon, numDensityElc, numDensityIon, tPerpElc, tPerpIon},
-    {heatFluxAtEdge, sheathCoefficients})
+    {heatFluxAtEdge})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -957,26 +956,26 @@ function writeFields(frameNum, tCurr)
    --sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
 end
 
---calcMoments(0.0, 0.0, distfElc, distfIon)
+calcMoments(0.0, 0.0, distfElc, distfIon)
 
---applyBc(0.0, 0.0, distfElc, distfIon, cutoffVelocities)
+applyBc(0.0, 0.0, distfElc, distfIon, cutoffVelocities)
 
 -- calculate initial phi
---runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
+runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
 -- Copy the continuous phi back onto a dg field
---runUpdater(copyCToD1d, tCurr, myDt, {phi1d}, {phi1dDg})
+runUpdater(copyCToD1d, 0.0, 0.0, {phi1d}, {phi1dDg})
 -- calculate initial Hamiltonian
---calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
---calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
+calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
+calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
 -- compute initial diagnostics
---calcDiagnostics(0.0, 0.0)
+calcDiagnostics(0.0, 0.0)
 -- write out initial conditions
---writeFields(0, 0.0)
+writeFields(0, 0.0)
 -- make a duplicate in case we need it
---distfDupElc = distfElc:duplicate()
---distfDupIon = distfIon:duplicate()
---hamilDupElc = hamilElc:duplicate()
---hamilDupIon = hamilIon:duplicate()
+distfDupElc = distfElc:duplicate()
+distfDupIon = distfIon:duplicate()
+hamilDupElc = hamilElc:duplicate()
+hamilDupIon = hamilIon:duplicate()
 
 -- parameters to control time-stepping
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
@@ -985,8 +984,8 @@ tCurr = tStart
 
 for frame = 1, nFrames do
    Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
-   --dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
-   --writeFields(frame, tCurr+tFrame)
+   dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
+   writeFields(frame, tCurr+tFrame)
    tCurr = tCurr+tFrame
    Lucee.logInfo ("")
 end
