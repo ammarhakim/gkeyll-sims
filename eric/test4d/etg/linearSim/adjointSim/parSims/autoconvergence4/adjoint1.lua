@@ -1013,7 +1013,7 @@ end
 
 --timePoints = 5 -- number of points to optimize free energy growth
 -- build array of times to optimize free energy growth
-tEndArray = {1.2,1.4,1.6,1.8,2.0}
+tEndArray = {1.2e-6,1.4e-6,1.6e-6,1.8e-6,2.0e-6}
 --for i = 1,timePoints do
 --  tEndArray[i] = i*tEnd/timePoints
 --end
