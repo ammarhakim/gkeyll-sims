@@ -7,9 +7,10 @@
 -- 5-11-2015: same as adjoint3.lua, but with different decomposition
 -- 5-11-2015: cos perturbation with 2x k
 -- 5-14-2015: lua code to determine iteration count based on accuracy
+-- 5-22-2015: optimization times 0.2,0.4,0.6,0.8,1.0
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 4, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 8, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
