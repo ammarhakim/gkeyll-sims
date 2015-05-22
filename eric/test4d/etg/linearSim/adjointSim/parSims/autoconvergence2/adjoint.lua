@@ -309,7 +309,7 @@ pbSlvr = Updater.PoissonBracketOpt4D {
    updateDirections = {0,1,2},
    zeroFluxDirections = {2,3},
    onlyIncrement = true,
-   fluxType = "upwind",
+   fluxType = "central",
 }
 
 -- Perturbed Hamiltonian
