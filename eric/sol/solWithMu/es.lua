@@ -55,13 +55,15 @@ c_i = math.sqrt(Te0*eV/ionMass)
 rho_i = c_i/Omega_i
 -- k_perpendicular
 kPerp = kPerpTimesRho/rho_i
-
+-- thermal velocities
+vtElc = math.sqrt(tPed*eV/elcMass)
+vtIon = math.sqrt(tPed*eV/ionMass)
 -- Pedestal sound speed (m/s)
 cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
 Sn   = A*nPed*cPed/lSource
 -- number of cells
-NZ, NV_PARA, N_MU = 8, 32, 16
+N_Z, N_VPARA, N_MU = 8, 32, 16
 -- domain extents
 Z_LOWER, Z_UPPER = -lParallel, lParallel
 -- electron velocity extents
@@ -79,19 +81,19 @@ MU_UPPER_ION = math.min(8, 4*math.sqrt(N_MU/2))*ionMass*vtIon*vtIon/B0
 gridElc = Grid.RectCart3D {
    lower = {Z_LOWER, VPARA_LOWER_ELC, MU_LOWER_ELC},
    upper = {Z_UPPER, VPARA_UPPER_ELC, MU_UPPER_ELC},
-   cells = {NZ, NV_PARA, N_MU},
+   cells = {N_Z, N_VPARA, N_MU},
 }
 -- phase space grid for ions
 gridIon = Grid.RectCart3D {
    lower = {Z_LOWER, VPARA_LOWER_ION, MU_LOWER_ION},
    upper = {Z_UPPER, VPARA_UPPER_ION, MU_UPPER_ION},
-   cells = {NZ, NV_PARA, N_MU},
+   cells = {N_Z, N_VPARA, N_MU},
 }
 -- spatial grid for both species
 grid_1d = Grid.RectCart1D {
    lower = {Z_LOWER},
    upper = {Z_UPPER},
-   cells = {NZ},
+   cells = {N_Z},
 }
 
 -- A generic function to run an updater.
@@ -340,7 +342,7 @@ runUpdater(mom0CalcElc, 0.0, 0.0, {distfElc}, {numDensityElc})
 numDensityElc:scale(2*math.pi*B0/elcMass)
 
 -- updater to initialize distribution function
-initDistfIon = Updater.ProjectOnNodalBasis2D {
+initDistfIon = Updater.ProjectOnNodalBasis3D {
    onGrid = gridIon,
    basis = basisIon,
    -- are common nodes shared?
@@ -454,7 +456,7 @@ initHamilIonKe = Updater.EvalOnNodes3D {
    basis = basisIon,
    shareCommonNodes = false,
    evaluate = function (z,vPara,mu,t)
-      return IonMass*vPara^2/2 + mu*B0
+      return ionMass*vPara^2/2 + mu*B0
    end
 }
 runUpdater(initHamilIonKe, 0.0, 0.0, {}, {hamilIonKeDg})
@@ -476,11 +478,11 @@ particleSourceUpdaterElc = Updater.ProjectOnNodalBasis3D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(z,vPara,mu,t)
-    if math.abs(x) < lSource/2 then
+    if math.abs(z) < lSource/2 then
       if t < tELM then
-        return Sn*math.cos(math.pi*x/lSource)*maxwellian(elcMass, math.sqrt(tPed*eV/elcMass), vPara, mu)
+        return Sn*math.cos(math.pi*z/lSource)*maxwellian(elcMass, math.sqrt(tPed*eV/elcMass), vPara, mu)
       else
-        return Sn/9*math.cos(math.pi*x/lSource)*maxwellian(elcMass, math.sqrt(210*eV/elcMass), vPara, mu)
+        return Sn/9*math.cos(math.pi*z/lSource)*maxwellian(elcMass, math.sqrt(210*eV/elcMass), vPara, mu)
       end
     else
       return 0
@@ -506,11 +508,11 @@ particleSourceUpdaterIon = Updater.ProjectOnNodalBasis3D {
    shareCommonNodes = false, -- In DG, common nodes are not shared
    -- function to use for initialization
    evaluate = function(z,vPara,mu,t)
-    if math.abs(x) < lSource/2 then
+    if math.abs(z) < lSource/2 then
       if t < tELM then
-        return Sn*math.cos(math.pi*x/lSource)*maxwellian(ionMass, math.sqrt(tPed*eV/ionMass), vPara, mu)
+        return Sn*math.cos(math.pi*z/lSource)*maxwellian(ionMass, math.sqrt(tPed*eV/ionMass), vPara, mu)
       else
-        return Sn/9*math.cos(math.pi*x/lSource)*maxwellian(ionMass, math.sqrt(260*eV/ionMass), vPara, mu)
+        return Sn/9*math.cos(math.pi*z/lSource)*maxwellian(ionMass, math.sqrt(260*eV/ionMass), vPara, mu)
       end
     else
       return 0
@@ -677,24 +679,24 @@ mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
 mhdHamiltonian1dDg = DataStruct.Field1D {
    onGrid = grid_1d,
    numComponents = basis_1d:numNodes(),
-   ghost = {2, 2},
+   ghost = {1, 1},
 }
 -- result of mhdHamiltonianCalc as continuous field
 mhdHamiltonian1d = DataStruct.Field1D {
    onGrid = grid_1d,
    numComponents = basis_1d:numExclusiveNodes(),
-   ghost = {2, 2},
+   ghost = {1, 1},
 }
-mhdHamiltonian2d = DataStruct.Field2D {
-   onGrid = gridIon,
-   numComponents = basisIon:numExclusiveNodes(),
-   ghost = {2, 2},
-}
-mhdHamiltonian2dDg = DataStruct.Field2D {
-   onGrid = gridIon,
-   numComponents = basisIon:numNodes(),
-   ghost = {2, 2},
-}
+--mhdHamiltonian2d = DataStruct.Field3D {
+--   onGrid = gridIon,
+--   numComponents = basisIon:numExclusiveNodes(),
+--   ghost = {1, 1},
+--}
+--mhdHamiltonian2dDg = DataStruct.Field2D {
+--   onGrid = gridIon,
+--   numComponents = basisIon:numNodes(),
+--   ghost = {1, 1},
+--}
 -- stores mhd hamiltonian contribution to total energy
 mhdHamiltonianEnergy = DataStruct.DynVector { numComponents = 1, }
 
@@ -764,8 +766,9 @@ end
 -- make objects to apply BCs
 bcLowerIon, bcUpperIon = makeBcObjIon()
 
+print('hello')
 -- updater to apply boundary condition on distribution function
-reflectingBc = Updater.ElectromagneticDistFuncReflectionBc {
+reflectingBc = Updater.SOL3DElectrostaticDistFuncReflectionBc {
    onGrid = gridElc,
    basis = basisElc,
    edge = "both",
@@ -775,6 +778,7 @@ reflectingBc = Updater.ElectromagneticDistFuncReflectionBc {
    elcMass = elcMass,
    ionMass = ionMass,
 }
+
 
 -- apply boundary conditions
 function applyBc(curr, dt, fldElc, fldIon, cutoffV)
@@ -941,11 +945,6 @@ copyCToD1d = Updater.CopyContToDisCont1D {
    basis = basis_1d,
 }
 
--- Copy a continuous field to a discontinuous field
-function calcDiscontinuousField(tCurr, dt, cgIn, dgOut)
-   runUpdater(copyCToD1d, tCurr, dt, {cgIn}, {dgOut})
-end
-
 -- write data to H5 files
 function writeFields(frameNum, tCurr)
    numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
@@ -958,26 +957,26 @@ function writeFields(frameNum, tCurr)
    --sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
 end
 
-calcMoments(0.0, 0.0, distfElc, distfIon)
+--calcMoments(0.0, 0.0, distfElc, distfIon)
 
-applyBc(0.0, 0.0, distfElc, distfIon, cutoffVelocities)
+--applyBc(0.0, 0.0, distfElc, distfIon, cutoffVelocities)
 
 -- calculate initial phi
-runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
+--runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
 -- Copy the continuous phi back onto a dg field
-runUpdater(copyCToD1d, tCurr, myDt, {phi1d}, {phi1dDg})
+--runUpdater(copyCToD1d, tCurr, myDt, {phi1d}, {phi1dDg})
 -- calculate initial Hamiltonian
-calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
-calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
+--calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
+--calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
 -- compute initial diagnostics
-calcDiagnostics(0.0, 0.0)
+--calcDiagnostics(0.0, 0.0)
 -- write out initial conditions
-writeFields(0, 0.0)
+--writeFields(0, 0.0)
 -- make a duplicate in case we need it
-distfDupElc = distfElc:duplicate()
-distfDupIon = distfIon:duplicate()
-hamilDupElc = hamilElc:duplicate()
-hamilDupIon = hamilIon:duplicate()
+--distfDupElc = distfElc:duplicate()
+--distfDupIon = distfIon:duplicate()
+--hamilDupElc = hamilElc:duplicate()
+--hamilDupIon = hamilIon:duplicate()
 
 -- parameters to control time-stepping
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
@@ -986,8 +985,8 @@ tCurr = tStart
 
 for frame = 1, nFrames do
    Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
-   dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
-   writeFields(frame, tCurr+tFrame)
+   --dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
+   --writeFields(frame, tCurr+tFrame)
    tCurr = tCurr+tFrame
    Lucee.logInfo ("")
 end
