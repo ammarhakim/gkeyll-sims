@@ -10,7 +10,7 @@
 -- 5-22-2015: Optimization times 1.2,1.4,1.6,1.8,2.0
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 8, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 8, 8, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -49,7 +49,7 @@ deltaR    = 32*rho_s
 L_T       = R/4
 ky_min    = 2*2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 8
+N_X = 2
 N_Y = 8
 N_VPARA = 16
 N_MU = N_VPARA/2
