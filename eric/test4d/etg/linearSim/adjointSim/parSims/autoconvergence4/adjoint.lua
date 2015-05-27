@@ -7,6 +7,7 @@
 -- 5-11-2015: same as adjoint3.lua, but with different decomposition
 -- 5-11-2015: cos perturbation with 2x k
 -- 5-14-2015: lua code to determine iteration count based on accuracy
+-- 5-25-2015: (obsolete)
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 4, 1} }
