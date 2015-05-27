@@ -8,6 +8,7 @@
 -- 5-11-2015: cos perturbation with 2x k
 -- 5-14-2015: lua code to determine iteration count based on accuracy
 -- 5-22-2015: Optimization times 1.2,1.4,1.6,1.8,2.0
+-- 5-25-2015: two cells in x
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 8, 8, 1} }

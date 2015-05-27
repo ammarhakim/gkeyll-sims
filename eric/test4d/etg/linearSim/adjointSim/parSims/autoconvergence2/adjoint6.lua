@@ -7,11 +7,11 @@
 -- 5-11-2015: same as adjoint3.lua, but with different decomposition
 -- 5-11-2015: cos perturbation with 2x k
 -- 5-14-2015: lua code to determine iteration count based on accuracy
--- 5-22-2015: Optimization times 0.2,0.4,0.6,0.8,1.0
--- 5-22-2015: 32 vPara cells
+-- 5-22-2015: optimization times 0.2,0.4,0.6,0.8,1.0
+-- 5-27-2015: like adjoint4.lua, but with 32 vPara and 16 X
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 4, 16, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 8, 16, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -47,11 +47,11 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/4
+L_T       = R/2
 ky_min    = 2*2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 1
-N_Y = 8
+N_Y = 16
 N_VPARA = 32
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
