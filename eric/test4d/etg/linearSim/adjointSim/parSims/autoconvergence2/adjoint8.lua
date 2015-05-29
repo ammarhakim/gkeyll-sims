@@ -9,6 +9,7 @@
 -- 5-14-2015: lua code to determine iteration count based on accuracy
 -- 5-22-2015: optimization times 0.2,0.4,0.6,0.8,1.0
 -- 5-27-2015: like adjoint4.lua, but with 32 vPara and 16 X
+-- 5-29-2015: like adjoint6.lua, but with a different initial condition
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 8, 16, 1} }
@@ -48,7 +49,7 @@ omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
 L_T       = R/2
-ky_min    = 2*math.pi/deltaR
+ky_min    = 2*2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 1
 N_Y = 16
@@ -189,11 +190,11 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y,v,mu)
+  --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
   local x0 = (X_LOWER+X_UPPER)/2
   local y0 = (Y_LOWER+Y_UPPER)/2
   local sigma = deltaR/4
-  return 1e-3*(vtKinetic/omega_s)/L_T*( math.cos(ky_min*y)
-  - 2/3*math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
+  return 1e-3*(vtKinetic/omega_s)/L_T*math.exp(-(y-y0)^2/(2*sigma^2))
 end
 
 function fProfile(x,y,v,mu)
