@@ -363,7 +363,7 @@ vThermSqPara = DataStruct.Field1D {
 vThermSq:clear(0.0)
 
 -- stuff to integrate vThermSq
-integrateVThermSq = Updater.IntegrateGeneralField1D {
+integrateSpatialField = Updater.IntegrateGeneralField1D {
   onGrid = grid_1d,
   basis = basis_1d,
 }
@@ -627,7 +627,7 @@ end
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   -- compute average temperature
-  runUpdater(integrateVThermSq, curr, dt, {vThermSqPara}, {integratedVThermSq})
+  runUpdater(integrateSpatialField, curr, dt, {vThermSqPara}, {integratedVThermSq})
   -- compute moments at edges
   runUpdater(momentsAtEdgesCalc, curr, dt, {distf, hamilKeDg}, {momentsAtEdges})
   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDiscont, momentsAtEdges, integratedVThermSq,
