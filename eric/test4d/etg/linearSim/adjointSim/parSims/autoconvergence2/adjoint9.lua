@@ -11,6 +11,7 @@
 -- 5-27-2015: like adjoint4.lua, but with 32 vPara and 16 X
 -- 5-29-2015: like adjoint6.lua, but with a different initial condition
 -- 6-2-2015: like adjoint8.lua, but with 2x spatial resolution
+-- 6-4-2015: changed tolerance to 0.001 to improve speed
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 16, 16, 1} }
@@ -28,7 +29,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTol = 0.01 -- desired tolerance for convergence
+iterTol = 0.001 -- desired tolerance for convergence
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
