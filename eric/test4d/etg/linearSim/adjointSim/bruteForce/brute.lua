@@ -16,9 +16,6 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 1e-7
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTotal = 40
-nFrames = 25
-tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -42,9 +39,9 @@ deltaR    = 32*rho_s
 L_T       = R/4
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 8
+N_X = 1
 N_Y = 8
-N_VPARA = 4
+N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
@@ -890,7 +887,7 @@ initSingleNode = Updater.SetSingleNodeToOne4D {
 }
 
 -- figure out how many nodes are in the system
-totalNodes = (N_X+2)*(N_Y+2)*(N_VPARA+2)*(N_MU+2)*basis_4d:numNodes()
+totalNodes = (N_X)*(N_Y)*(N_VPARA)*(N_MU)*basis_4d:numNodes()
 print(string.format("-- Total nodes = %g",totalNodes))
 
 matrixConstructor = Updater.ConstructLinearOperatorMatrix4D {
