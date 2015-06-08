@@ -195,6 +195,7 @@ initb = Updater.EvalOnNodes2D {
   end
 }
 runUpdater(initb, 0.0, 0.0, {}, {bField2d})
+bField2d:sync()
 -- Copy magnetic field to 4d
 runUpdater(copy2dTo4d, 0.0, 0.0, {bField2d}, {bField4d})
 
@@ -558,8 +559,10 @@ numDensityAdiabatic:copy(numDensityKinetic)
 numDensityKineticBackground:copy(numDensityKinetic)
 -- Store background f
 fBackground:copy(f)
+fBackground:sync()
 -- Compute background f's temperature
 calcBackgroundTemperature(fBackground, 0.0, 0.0, backgroundKineticTemp)
+backgroundKineticTemp:sync()
 
 -- keeps track of what node is being passed to initSingleNode
 initIndex = 0
@@ -575,7 +578,7 @@ initSingleNode = Updater.SetSingleNodeToOne4D {
 }
 
 -- figure out how many nodes are in the system
-totalNodes = (N_X)*(N_Y)*(N_VPARA)*(N_MU)*basis_4d:numNodes()
+totalNodes = (N_X+2)*(N_Y+2)*(N_VPARA+2)*(N_MU+2)*basis_4d:numNodes()
 print(string.format("-- Total nodes = %g",totalNodes))
 
 gNodeIndex = 0

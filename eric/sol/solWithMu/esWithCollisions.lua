@@ -1144,7 +1144,7 @@ function writeFields(frameNum, tCurr)
    --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
-   --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
+   cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
    --sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
 end
 
