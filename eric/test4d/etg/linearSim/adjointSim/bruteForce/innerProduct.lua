@@ -300,6 +300,16 @@ numDensityKinetic = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
+gNumDensity = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+hNumDensity = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 numDensityKineticBackground = numDensityKinetic:duplicate()
 numDensityKineticPerturbed = numDensityKinetic:duplicate()
 numDensityAdiabatic = numDensityKinetic:duplicate()
@@ -533,9 +543,8 @@ function calcBackgroundTemperature(fIn, curr, dt, outputField)
   outputField:scale(1/eV)
 end
 
-function calcPotential(phiOut, fIn)
-  calcNumDensity(fIn, numDensityKineticPerturbed)
-  phiOut:copy(numDensityKineticPerturbed)
+function calcPotential(phiOut, numDensityPerturbed)
+  phiOut:copy(numDensityPerturbed)
   phiOut:scale(-adiabaticTemp/n0)
   phiOut:sync()
 end
@@ -580,6 +589,7 @@ initSingleNode = Updater.SetSingleNodeToOne4D {
 -- figure out how many nodes are in the system
 totalNodes = (N_X+2)*(N_Y+2)*(N_VPARA+2)*(N_MU+2)*basis_4d:numNodes()
 print(string.format("-- Total nodes = %g",totalNodes))
+nodesPerPosition = (N_VPARA+2)*(N_MU+2)*basis_4d:numNodes()
 
 gNodeIndex = 0
 hNodeIndex = 0
@@ -589,10 +599,11 @@ matrixConstructor = Updater.ETGInnerProduct {
   basis2d = basis_2d,
   shareCommonNodes = false,
   adiabaticTemp = adiabaticTemp,
-  adiabaticDensity = n0,
+  n0 = n0,
   eV = eV,
   kineticMass = kineticMass,
   totalNodes = totalNodes,
+  nodesPerPosition = nodesPerPosition,
   -- function to communicate what column to write to
   evaluate = function (t)
    return gNodeIndex, hNodeIndex
@@ -610,9 +621,7 @@ for gNode = 0, totalNodes-1 do
   -- Apply boundary conditions to distribution function
   g:sync()
   -- Compute initial potential with perturbation added
-  calcPotential(phi2d, g)
-  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothedForG})
-  phi2dSmoothedForG:sync()
+  calcNumDensity(g, gNumDensity)
   
   for hNode = 0, gNode do
     hNodeIndex = hNode
@@ -622,11 +631,9 @@ for gNode = 0, totalNodes-1 do
     -- Apply boundary conditions to distribution function
     h:sync()
     -- Compute initial potential with perturbation added
-    calcPotential(phi2d, h)
-    runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothedForH})
-    phi2dSmoothedForH:sync()
+    calcNumDensity(h, hNumDensity)
     -- Compute inner product
     runUpdater(matrixConstructor, 0.0, 0.0, {bField2d, backgroundKineticTemp, fBackground,
-      phi2dSmoothedForG, phi2dSmoothedForH, g, h}, {})
+      gNumDensity, hNumDensity, g, h}, {})
   end
 end
