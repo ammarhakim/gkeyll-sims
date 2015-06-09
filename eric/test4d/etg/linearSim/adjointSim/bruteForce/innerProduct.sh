@@ -5,7 +5,7 @@
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
 #PBS -l nodes=1:ppn=1 
-#PBS -l mem=12000mb
+#PBS -l mem=10000mb
 #PBS -l walltime=32:00:00
 #PBS -r n
 #PBS -V 
