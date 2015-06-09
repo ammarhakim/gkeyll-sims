@@ -41,7 +41,7 @@ ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 1
 N_Y = 8
-N_VPARA = 8
+N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
