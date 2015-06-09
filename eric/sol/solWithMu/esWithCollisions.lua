@@ -1,6 +1,4 @@
--- Input file for SOL problem with kinetic ions and electrons
--- Not sure what the math.pi's are all about, but this file was used for paper figure
--- Modified so that ghost cells are all = {2, 2}
+-- Input file for SOL problem with kinetic ions and electrons (1d2v) with lb collisions
 
 -- polynomial order
 polyOrder = 2
