@@ -196,12 +196,12 @@ mom1MuIon = DataStruct.Field1D {
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
 }
-tPerpElc = DataStruct.Field1D {
+tElc = DataStruct.Field1D {
    onGrid = grid_1d,
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
 }
-tPerpIon = DataStruct.Field1D {
+tIon = DataStruct.Field1D {
    onGrid = grid_1d,
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
@@ -561,6 +561,41 @@ cutoffVelocities = DataStruct.DynVector { numComponents = 2, }
 cutoffVelocities1 = DataStruct.DynVector { numComponents = 2, }
 cutoffVelocities2 = DataStruct.DynVector { numComponents = 2, }
 
+-- Parallel drift velocities
+driftUElc = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+driftUIon = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+-- vt^2 for both species
+vThermSqElc = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+vThermSqIon = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+-- updaters to calculate total temperature
+vFromMomentsCalcElc = Updater.VelocitiesFromMoments3DUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+  scaleFactor = 2*math.pi*B0/elcMass,
+}
+
+vFromMomentsCalcIon = Updater.VelocitiesFromMoments3DUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+  scaleFactor = 2*math.pi*B0/ionMass,
+}
+
 -- compute moments from distribution function
 function calcMoments(curr, dt, distfElcIn, distfIonIn)
   -- moment 0
@@ -790,6 +825,11 @@ end
 
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
+   -- compute vThermSq(z) for both species
+   runUpdater(vFromMomentsCalcElc, curr, dt, {numDensityElc, mom1ParaElc, mom1MuElc, mom2ParaElc},
+    {driftUElc, vThermSqElc})
+   runUpdater(vFromMomentsCalcIon, curr, dt, {numDensityIon, mom1ParaIon, mom1MuIon, mom2ParaIon},
+    {driftUIon, vThermSqIon})
    -- compute moments at edges
    runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilElcKeDg}, {momentsAtEdgesElc})
    runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon, hamilIonKeDg}, {momentsAtEdgesIon})
@@ -797,14 +837,14 @@ function calcDiagnostics(curr, dt)
    -- TODO: change it so it takes phi1dDg as input instead of phi1d
    runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
    runUpdater(copyCToD1d, curr, dt, {phi1dAfterBc}, {phi1dDg})
-   -- compute n*T_perp for both species
-   tPerpElc:copy(mom1MuElc)
-   tPerpElc:scale(0.5*elcMass/eV)
-   tPerpIon:copy(mom1MuIon)
-   tPerpIon:scale(0.5*ionMass/eV)
+   -- compute temperature for both species in eV
+   tElc:copy(vThermSqElc)
+   tElc:scale(elcMass/eV)
+   tIon:copy(vThermSqIon)
+   tIon:scale(ionMass/eV)
    -- compute heat flux at edges
    runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
-    momentsAtEdgesIon, numDensityElc, numDensityIon, tPerpElc, tPerpIon},
+    momentsAtEdgesIon, tElc, tIon},
     {heatFluxAtEdge})
 end
 
