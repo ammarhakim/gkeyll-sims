@@ -198,12 +198,12 @@ mom1MuIon = DataStruct.Field1D {
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
 }
-tPerpElc = DataStruct.Field1D {
+tElc = DataStruct.Field1D {
    onGrid = grid_1d,
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
 }
-tPerpIon = DataStruct.Field1D {
+tIon = DataStruct.Field1D {
    onGrid = grid_1d,
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
@@ -714,8 +714,8 @@ setPhiAtBoundaryCalc = Updater.SetPhiAtBoundaryUpdater {
 }
 
 -- Dynvectors to store 0-3rd moments at left and right edges
-momentsAtEdgesElc = DataStruct.DynVector { numComponents = 8, }
-momentsAtEdgesIon = DataStruct.DynVector { numComponents = 8, }
+momentsAtEdgesElc = DataStruct.DynVector { numComponents = 3, }
+momentsAtEdgesIon = DataStruct.DynVector { numComponents = 3, }
 
 momentsAtEdgesElcCalc = Updater.MomentsAtEdges3DUpdater {
   onGrid = gridElc,
@@ -730,9 +730,9 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdges3DUpdater {
 }
 
 -- dynvector for heat flux at edge
-heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
+heatFluxAtEdge = DataStruct.DynVector { numComponents = 3, }
 -- dynvector for sheath power transmission coefficients
-sheathCoefficients = DataStruct.DynVector { numComponents = 7, }
+sheathCoefficients = DataStruct.DynVector { numComponents = 3, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdge3DUpdater {
@@ -742,8 +742,9 @@ heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdge3DUpdater {
    basis = basis_1d,
    ionMass = ionMass,
    electronMass = elcMass,
+   B0 = B0,
    -- Enable calculation of sheath coefficients
-   computeSheathCoefficient = false,
+   computeSheathCoefficient = true,
 }
 
 -- updaters to calculate total temperature
@@ -945,15 +946,14 @@ function calcDiagnostics(curr, dt)
   -- TODO: change it so it takes phi1dDg as input instead of phi1d
   runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
   runUpdater(copyCToD1d, curr, dt, {phi1dAfterBc}, {phi1dDg})
-  -- compute n*T_perp for both species
-  tPerpElc:copy(mom1MuElc)
-  tPerpElc:scale(0.5*elcMass/eV)
-  tPerpIon:copy(mom1MuIon)
-  tPerpIon:scale(0.5*ionMass/eV)
+  -- compute temperature for both species in eV
+  tElc:copy(vThermSqElc)
+  tElc:scale(elcMass/eV)
+  tIon:copy(vThermSqIon)
+  tIon:scale(ionMass/eV)
   -- compute heat flux at edges
   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
-  momentsAtEdgesIon, numDensityElc, numDensityIon, tPerpElc, tPerpIon},
-  {heatFluxAtEdge})
+  momentsAtEdgesIon, tElc, tIon}, {heatFluxAtEdge, sheathCoefficients})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -1143,7 +1143,7 @@ function writeFields(frameNum, tCurr)
    phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
-   --sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
+   sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
