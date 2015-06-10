@@ -623,7 +623,7 @@ for gNode = 0, totalNodes-1 do
   -- Compute initial potential with perturbation added
   calcNumDensity(g, gNumDensity)
   
-  for hNode = 0, gNode do
+  for hNode = math.max(0,gNode-nodesPerPosition), gNode do
     hNodeIndex = hNode
     -- initialize h distribution function
     initIndex = hNode

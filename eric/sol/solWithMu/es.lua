@@ -620,24 +620,24 @@ setPhiAtBoundaryCalc = Updater.SetPhiAtBoundaryUpdater {
   elcCharge = eV,
 }
 
--- Dynvectors to store 0-3rd moments at left and right edges
-momentsAtEdgesElc = DataStruct.DynVector { numComponents = 8, }
-momentsAtEdgesIon = DataStruct.DynVector { numComponents = 8, }
+-- Dynvectors to store moments at right edge only
+momentsAtEdgesElc = DataStruct.DynVector { numComponents = 3, }
+momentsAtEdgesIon = DataStruct.DynVector { numComponents = 3, }
 
 momentsAtEdgesElcCalc = Updater.MomentsAtEdges3DUpdater {
   onGrid = gridElc,
   basis = basisElc,
-  scaleFactor = 2*math.pi*B0/elcMass;
+  scaleFactor = 2*math.pi*B0/elcMass,
 }
 
 momentsAtEdgesIonCalc = Updater.MomentsAtEdges3DUpdater {
   onGrid = gridIon,
   basis = basisIon,
-  scaleFactor = 2*math.pi*B0/ionMass
+  scaleFactor = 2*math.pi*B0/ionMass,
 }
 
 -- dynvector for heat flux at edge
-heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
+heatFluxAtEdge = DataStruct.DynVector { numComponents = 3, }
 -- dynvector for sheath power transmission coefficients
 sheathCoefficients = DataStruct.DynVector { numComponents = 7, }
 
@@ -647,8 +647,10 @@ heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdge3DUpdater {
    onGrid = grid_1d,
    -- basis functions to use
    basis = basis_1d,
+   -- physical parameters
    ionMass = ionMass,
    electronMass = elcMass,
+   B0 = B0,
    -- Enable calculation of sheath coefficients
    computeSheathCoefficient = false,
 }
