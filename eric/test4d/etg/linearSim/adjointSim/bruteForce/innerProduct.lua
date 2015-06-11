@@ -619,7 +619,7 @@ for gNode = 0, totalNodes-1 do
   initIndex = gNode
   runUpdater(initSingleNode, 0.0, 0.0, {}, {g})
   -- Apply boundary conditions to distribution function
-  g:sync()
+  --g:sync()
   -- Compute initial potential with perturbation added
   calcNumDensity(g, gNumDensity)
   
@@ -629,7 +629,7 @@ for gNode = 0, totalNodes-1 do
     initIndex = hNode
     runUpdater(initSingleNode, 0.0, 0.0, {}, {h})
     -- Apply boundary conditions to distribution function
-    h:sync()
+    --h:sync()
     -- Compute initial potential with perturbation added
     calcNumDensity(h, hNumDensity)
     -- Compute inner product
