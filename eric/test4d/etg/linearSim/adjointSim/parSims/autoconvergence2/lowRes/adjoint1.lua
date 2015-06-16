@@ -1,12 +1,25 @@
 -- Input file for ETG test problem
--- Species are referred to as the 'kinetic' or 'adiabatic' specie
 -- 4-4-2015: Split original full-F simulation into a delta F simulation
 -- 4-10-2015: Added free energy calculation. Haven't debugged adjoint looping yet.
 -- 4-22-2015: More testing
--- 4-25-2015: Starting with eigenmode
--- 5-1-2015: possibly another guess at eigenmode
--- 6-3-2015: new simulation. constructs linear update matrix for the etg problem
+-- 4-23-2015: parallel version
+-- 5-1-2015: debugged known issues so far
+-- 5-11-2015: same as adjoint3.lua, but with different decomposition
+-- 5-11-2015: cos perturbation with 2x k
+-- 5-14-2015: lua code to determine iteration count based on accuracy
+-- 5-22-2015: optimization times 0.2,0.4,0.6,0.8,1.0
+-- 5-27-2015: like adjoint4.lua, but with 32 vPara and 16 X
+-- 5-29-2015: like adjoint6.lua, but with a different initial condition
+-- 6-11-2015: like adjoint8.lua, but with much lower resolution
+-- 6-16-2015: like adjoint0.lua, but even more low res
 
+-- phase-space decomposition
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 1, 2, 1} }
+-- configuration space decomposition
+confDecomp = DecompRegionCalc2D.SubCartProd4D {
+   decomposition = phaseDecomp,
+   collectDirections = {0, 1},
+}
 -- polynomial order
 polyOrder = 1
 
@@ -14,8 +27,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1e-7
+tEnd = 10e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
+iterTol = 0.0001 -- desired tolerance for convergence
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -37,10 +51,10 @@ omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
 L_T       = R/2
-ky_min    = 2*math.pi/deltaR
+ky_min    = 2*2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 1
-N_Y = 4
+N_Y = 2
 N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
@@ -51,7 +65,7 @@ Y_UPPER = deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/B0
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -78,6 +92,13 @@ grid_4d = Grid.RectCart4D {
    upper = {X_UPPER, Y_UPPER, VPARA_UPPER, MU_UPPER},
    cells = {N_X, N_Y, N_VPARA, N_MU},
    periodicDirs = {0, 1},
+   decomposition = phaseDecomp,
+}
+grid_back_4d = Grid.RectCart4D {
+   lower = {X_LOWER, Y_LOWER, VPARA_LOWER, MU_LOWER},
+   upper = {X_UPPER, Y_UPPER, VPARA_UPPER, MU_UPPER},
+   cells = {N_X, N_Y, N_VPARA, N_MU},
+   decomposition = phaseDecomp,
 }
 -- 2d spatial grid
 grid_2d = Grid.RectCart2D {
@@ -85,12 +106,13 @@ grid_2d = Grid.RectCart2D {
    upper = {X_UPPER, Y_UPPER},
    cells = {N_X, N_Y},
    periodicDirs = {0, 1},
+   decomposition = confDecomp,
 }
 grid_back_2d = Grid.RectCart2D {
    lower = {X_LOWER, Y_LOWER},
    upper = {X_UPPER, Y_UPPER},
    cells = {N_X, N_Y},
-   periodicDirs = {1},
+   decomposition = confDecomp,
 }
 -- create 4d basis functions
 basis_4d = NodalFiniteElement4D.SerendipityElement {
@@ -103,26 +125,51 @@ basis_2d = NodalFiniteElement2D.SerendipityElement {
    polyOrder = polyOrder,
 }
 
--- distribution function for electrons
+-- perturbed distribution function for electrons
 f = DataStruct.Field4D {
    onGrid = grid_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
 -- for RK time-stepping
-f1 = f:duplicate()
-f1Intermediate = f:duplicate()
+f1 = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
+f1Intermediate = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- updated solution
-fNew = f:duplicate()
+fNew = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- for use in time-stepping
-fNewDup = f:duplicate()
+fNewDup = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- to store background distfElc
-fBackground = f:duplicate()
-fFluctuating = f:duplicate()
-fInitialPerturb = fFluctuating:duplicate()
-fFull = f:duplicate()
--- for adjoint iteration
-fAdjoint = f:duplicate()
+fBackground = DataStruct.Field4D {
+   onGrid = grid_back_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
+fInitialPerturb = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
+fFull = DataStruct.Field4D {
+   onGrid = grid_back_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- to copy 2d field to a 4d field
 copy2dTo4d = Updater.NodalCopy2DTo4DFieldUpdater {
@@ -145,8 +192,11 @@ function kineticTempProfile(x)
 end
 
 function perturbDensityProfile(x,y,v,mu)
-  return 1e-3*(vtKinetic/omega_s)/L_T*( math.cos(ky_min*y)
-  - math.sqrt(2)*((kineticMass*v^2 + 2*mu*bFieldProfile(x))/(2*kineticTempProfile(x)*eV) - 3/2)*math.sin(ky_min*y) ) 
+  --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  local x0 = (X_LOWER+X_UPPER)/2
+  local y0 = (Y_LOWER+Y_UPPER)/2
+  local sigma = deltaR/4
+  return 1e-3*(vtKinetic/omega_s)/L_T*math.exp(-(y-y0)^2/(2*sigma^2))
 end
 
 function fProfile(x,y,v,mu)
@@ -157,7 +207,7 @@ end
 
 -- initialize electron distribution function
 initKineticF = Updater.EvalOnNodes4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    basis = basis_4d,
    shareCommonNodes = false,
    -- function to use for initialization
@@ -178,22 +228,23 @@ initKineticFPerturb = Updater.EvalOnNodes4D {
 	 end
 }
 runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
+fInitialPerturb:sync()
 
 -- Magnetic Field (2D)
 bField2d = DataStruct.Field2D {
-   onGrid = grid_2d,
+   onGrid = grid_back_2d,
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
 -- Magnetic Field (4D)
 bField4d = DataStruct.Field4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
 -- Updater to initialize bfield2d
 initb = Updater.EvalOnNodes2D {
-  onGrid = grid_2d,
+  onGrid = grid_back_2d,
   basis = basis_2d,
   shareCommonNodes = false,
   evaluate = function (x,y,t)
@@ -201,17 +252,19 @@ initb = Updater.EvalOnNodes2D {
   end
 }
 runUpdater(initb, 0.0, 0.0, {}, {bField2d})
+bField2d:sync()
 -- Copy magnetic field to 4d
 runUpdater(copy2dTo4d, 0.0, 0.0, {bField2d}, {bField4d})
+bField4d:sync()
 
 -- Jacobian Factor (4D)
 jacobianField = DataStruct.Field4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
 initJacobian = Updater.EvalOnNodes4D {
-  onGrid = grid_4d,
+  onGrid = grid_back_4d,
   basis = basis_4d,
   shareCommonNodes = false,
   evaluate = function (x,y,t)
@@ -220,16 +273,17 @@ initJacobian = Updater.EvalOnNodes4D {
 }
 -- Fill out jacobian
 runUpdater(initJacobian, 0.0, 0.0, {}, {jacobianField})
+jacobianField:sync()
 
 -- B_y^* field (4D)
 bStarYField = DataStruct.Field4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
 -- Updater to initialize bStarY
 initbStarY = Updater.EvalOnNodes4D {
-  onGrid = grid_4d,
+  onGrid = grid_back_4d,
   basis = basis_4d,
   shareCommonNodes = false,
   evaluate = function (x,y,vPara,mu,t)
@@ -237,6 +291,7 @@ initbStarY = Updater.EvalOnNodes4D {
   end
 }
 runUpdater(initbStarY, 0.0, 0.0, {}, {bStarYField})
+bStarYField:sync()
 
 -- define equation to solve
 gyroEqn = PoissonBracketEquation.GyroEquation4D {
@@ -245,7 +300,7 @@ gyroEqn = PoissonBracketEquation.GyroEquation4D {
   bStarY = bStarYField,
 }
 -- This one takes dF and H0
-pbSlvrOne = Updater.PoissonBracketOpt4D {
+pbSlvr = Updater.PoissonBracketOpt4D {
    onGrid = grid_4d,
    -- basis functions to use
    basis = basis_4d,
@@ -261,23 +316,6 @@ pbSlvrOne = Updater.PoissonBracketOpt4D {
    fluxType = "central",
 }
 
--- This one takes F0 and dH
-pbSlvrTwo = Updater.PoissonBracketOpt4D {
-   onGrid = grid_4d,
-   -- basis functions to use
-   basis = basis_4d,
-   -- CFL number
-   cfl = cfl,
-   -- equation to solve
-   equation = gyroEqn,
-   -- let solver know about additional jacobian factor
-   jacobianField = jacobianField,
-   updateDirections = {0,1,2},
-   zeroFluxDirections = {2,3},
-   onlyIncrement = true,
-   fluxType = "central"
-}
-
 -- Perturbed Hamiltonian
 hamilPerturbed = DataStruct.Field4D {
    onGrid = grid_4d,
@@ -285,12 +323,20 @@ hamilPerturbed = DataStruct.Field4D {
    ghost = {1, 1},
 }
 -- Duplicate of hamil for reverting
-hamilDup = hamilPerturbed:duplicate()
+hamilDup = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- Static hamiltonian (KE only)
-hamilBackground = hamilPerturbed:duplicate()
+hamilBackground = DataStruct.Field4D {
+   onGrid = grid_back_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 -- Updater to initialize KE part of hamil
 initHamilBackground = Updater.EvalOnNodes4D {
-   onGrid = grid_4d,
+   onGrid = grid_back_4d,
    basis = basis_4d,
    shareCommonNodes = false,
    evaluate = function (x,y,vPara,mu,t)
@@ -298,16 +344,29 @@ initHamilBackground = Updater.EvalOnNodes4D {
    end
 }
 runUpdater(initHamilBackground, 0.0, 0.0, {}, {hamilBackground})
+hamilBackground:sync()
 
 -- to store number density
 numDensityKinetic = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+numDensityKineticBackground = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+numDensityKineticPerturbed = DataStruct.Field2D {
    onGrid = grid_2d,
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-numDensityKineticBackground = numDensityKinetic:duplicate()
-numDensityKineticPerturbed = numDensityKinetic:duplicate()
-numDensityAdiabatic = numDensityKinetic:duplicate()
+numDensityAdiabatic = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 -- to compute number density
 numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- 4D phase-space grid 
@@ -333,7 +392,11 @@ vParaCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- direction to calculate moment
    momentDirection = 2,
 }
-vPara = numDensityKinetic:duplicate()
+vPara = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- to compute mu moment
 muCalc = Updater.DistFuncMomentCalcWeighted2D {
@@ -348,8 +411,16 @@ muCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- direction to calculate moment
    momentDirection = 3,
 }
-muMoment = numDensityKinetic:duplicate()
-muMomentTimesB = numDensityKinetic:duplicate()
+muMoment = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+muMomentTimesB = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- to compute vParaSq moment
 vParaSqCalc = Updater.DistFuncMomentCalcWeighted2D {
@@ -364,24 +435,48 @@ vParaSqCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- direction to calculate moment
    momentDirection = 2,
 }
-vParaSq = numDensityKinetic:duplicate()
+vParaSq = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 
-kineticTempField = numDensityKinetic:duplicate()
-backgroundKineticTemp = numDensityKinetic:duplicate()
+kineticTempField = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+backgroundKineticTemp = DataStruct.Field2D {
+   onGrid = grid_back_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 backgroundKineticTemp4d = DataStruct.Field4D {
    onGrid = grid_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
-adjointPotential = numDensityKinetic:duplicate()
-adjointPotentialSmoothed = numDensityKinetic:duplicate()
+adjointPotential = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+adjointPotentialSmoothed = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 adjointPotential4d = DataStruct.Field4D {
    onGrid = grid_4d,
    numComponents = basis_4d:numNodes(),
    ghost = {1, 1},
 }
 -- Duplicate of adjoint potential for reverting
-adjointPotential4dDup = adjointPotential4d:duplicate()
+adjointPotential4dDup = DataStruct.Field4D {
+   onGrid = grid_4d,
+   numComponents = basis_4d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- to store the electrostatic potential on spatial grid
 phi2d = DataStruct.Field2D {
@@ -389,20 +484,22 @@ phi2d = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-phi2dSmoothed = phi2d:duplicate()
-phi2dBackground = DataStruct.Field2D {
-   onGrid = grid_back_2d,
+phi2dSmoothed = DataStruct.Field2D {
+   onGrid = grid_2d,
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-phi2dFluctuating = phi2d:duplicate()
 -- to store electrostatic potential for addition to hamiltonian
 phi4dSmoothed = DataStruct.Field4D {
   onGrid = grid_4d,
   numComponents = basis_4d:numNodes(),
   ghost = {1, 1},
 }
-phi4dSmoothedDup = phi4dSmoothed:duplicate()
+phi4dSmoothedDup = DataStruct.Field4D {
+  onGrid = grid_4d,
+  numComponents = basis_4d:numNodes(),
+  ghost = {1, 1},
+}
 
 -- Updater to compute potential
 phiCalc = Updater.ETGAdiabaticPotentialUpdater {
@@ -436,33 +533,12 @@ multiply2dCalc = Updater.FieldArithmeticUpdater2D {
   end
 }
 
-function applyBcToBackgroundPotential(fld)
-  fld:applyCopyBc(0, "lower")
-  fld:applyCopyBc(0, "upper")
-  fld:sync()
-end
-
-function applyBcToPerturbedDistF(fld)
-  -- Apply periodic boundary conditions to fluctuating component
-  fld:sync()
-end
-
-function applyBcToTotalDistF(fld)
-  -- Subtract out fluctuating component from f
-  fFluctuating:copy(fld)
-  fFluctuating:accumulate(-1.0, fBackground)
-  fld:accumulate(-1.0, fFluctuating)
-  -- Apply periodic boundary conditions to fluctuating component
-  fFluctuating:sync()
-  -- Add back to total field
-  fld:accumulate(1.0, fFluctuating)
-end
-
 function calcPerturbedHamiltonian(phi2dIn, hamilOut)
   -- copy 2d potential to 4d output field
   runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dIn}, {hamilOut})
   -- scale by charge
   hamilOut:scale(kineticCharge)
+  hamilOut:sync()
 end
 
 -- dynvector for field energy
@@ -533,10 +609,11 @@ function calcDiagnostics(curr, dt)
   --runUpdater(vParaSqCalc, curr, dt, {f, bField2d}, {vParaSq})
   --vParaSq:scale(2*math.pi/kineticMass)
   --runUpdater(fieldEnergyCalc, curr, dt, {phi2dSmoothed}, {fieldEnergy})
+
   calcFreeEnergy(curr, dt, f, freeEnergy)
 end
 
--- Return temperautre (in eV?)
+-- Return temperature (in eV?)
 function calcTemperature(fIn, curr, dt, outputField)
   fFull:copy(fBackground)
   fFull:accumulate(fIn)
@@ -604,7 +681,7 @@ end
 -- (in eV?)
 function calcFreeEnergy(curr, dt, fIn, freeEnergyOut)
   calcNumDensity(fIn, numDensityKineticPerturbed)
-  --calcTemperature(f, curr, dt, kineticTempField)
+  --calcTemperature(fIn, curr, dt, kineticTempField)
   runUpdater(freeEnergyCalc, curr, dt, {bField2d, backgroundKineticTemp,
     numDensityKineticBackground, numDensityKineticPerturbed, fBackground, fIn}, {freeEnergyOut})
 end
@@ -613,9 +690,9 @@ end
 function rk3adjoint(tCurr, myDt)
   -- RK stage 1
   f1:copy(f)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
   f1:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   f1:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {f1, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -624,8 +701,7 @@ function rk3adjoint(tCurr, myDt)
   if (myStatusOne == false or myStatusTwo == false) then
     return false, math.min(myDtSuggestedOne, myDtSuggestedTwo)
   end
-
-  applyBcToPerturbedDistF(f1)
+  f1:sync()
   -- compute potential
   calcPotential(phi2d, f1)
   -- smooth potential
@@ -635,14 +711,16 @@ function rk3adjoint(tCurr, myDt)
   calcAdjointPotential(tCurr, myDt, f1, adjointPotential)
   runUpdater(copy2dTo4d, tCurr, myDt, {adjointPotential}, {adjointPotential4d})
   runUpdater(copy2dTo4d, tCurr, myDt, {phi2dSmoothed}, {phi4dSmoothed})
+  adjointPotential4d:sync()
+  phi4dSmoothed:sync()
   -- Compute hamiltonian
   calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
 
   -- RK stage 2
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -653,7 +731,7 @@ function rk3adjoint(tCurr, myDt)
   end
 
   f1:combine(3.0/4.0, f, 1.0/4.0, fNew)
-  applyBcToPerturbedDistF(f1)
+  f1:sync()
   -- compute potential
   calcPotential(phi2d, f1)
   -- smooth potential
@@ -663,14 +741,16 @@ function rk3adjoint(tCurr, myDt)
   calcAdjointPotential(tCurr, myDt, f1, adjointPotential)
   runUpdater(copy2dTo4d, myDt, myDt, {adjointPotential}, {adjointPotential4d})
   runUpdater(copy2dTo4d, tCurr, myDt, {phi2dSmoothed}, {phi4dSmoothed})
+  adjointPotential4d:sync()
+  phi4dSmoothed:sync()
   -- Compute hamiltonian
   calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
 
   -- RK stage 3
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(-myDt, f1Intermediate)
   local myStatusThree, myDtSuggestedThree = runUpdater(adjointSource, tCurr, myDt,
     {fNew, phi4dSmoothed, adjointPotential4d, backgroundKineticTemp4d, fBackground, bField4d}, {f1Intermediate})
@@ -681,7 +761,7 @@ function rk3adjoint(tCurr, myDt)
   end
 
   f1:combine(1.0/3.0, f, 2.0/3.0, fNew)
-  applyBcToPerturbedDistF(f1)
+  f1:sync()
   -- compute potential
   calcPotential(phi2d, f1)
   -- smooth potential
@@ -691,6 +771,8 @@ function rk3adjoint(tCurr, myDt)
   calcAdjointPotential(tCurr, myDt, f1, adjointPotential)
   runUpdater(copy2dTo4d, myDt, myDt, {adjointPotential}, {adjointPotential4d})
   runUpdater(copy2dTo4d, tCurr, myDt, {phi2dSmoothed}, {phi4dSmoothed})
+  adjointPotential4d:sync()
+  phi4dSmoothed:sync()
   -- Compute hamiltonian
   calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
 
@@ -703,16 +785,15 @@ end
 function rk3(tCurr, myDt)
   -- RK stage 1
   f1:copy(f)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f, hamilBackground}, {f1Intermediate})
   f1:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   f1:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
     return false, math.min(myDtSuggestedOne, myDtSuggestedTwo)
   end
-
-  applyBcToPerturbedDistF(f1)
+  f1:sync()
   -- compute potential
   calcPotential(phi2d, f1)
   -- smooth potential
@@ -723,9 +804,9 @@ function rk3(tCurr, myDt)
 
   -- RK stage 2
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -733,7 +814,7 @@ function rk3(tCurr, myDt)
   end
 
   f1:combine(3.0/4.0, f, 1.0/4.0, fNew)
-  applyBcToPerturbedDistF(f1)
+  f1:sync()
   -- compute potential
   calcPotential(phi2d, f1)
   -- smooth potential
@@ -744,9 +825,9 @@ function rk3(tCurr, myDt)
 
   -- RK stage 3
   fNew:copy(f1)
-  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
+  local myStatusOne, myDtSuggestedOne = runUpdater(pbSlvr, tCurr, myDt, {f1, hamilBackground}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
-  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
+  local myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvr, tCurr, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
   fNew:accumulate(myDt, f1Intermediate)
 
   if (myStatusOne == false or myStatusTwo == false) then
@@ -754,7 +835,7 @@ function rk3(tCurr, myDt)
   end
 
   f1:combine(1.0/3.0, f, 2.0/3.0, fNew)
-  applyBcToPerturbedDistF(f1)
+  f1:sync()
   -- compute potential
   calcPotential(phi2d, f1)
   -- smooth potential
@@ -830,12 +911,12 @@ function advanceFrameAdjoint(tStart, tEnd, initDt)
       myDt = tEnd-tCurr
     end
 
-    Lucee.logInfo (string.format("(Adjoint) Taking step %d at time %g with dt %g", step, tCurr, myDt))
+    Lucee.logInfo (string.format("Taking step %d at time %g with dt %g", step, tCurr, myDt))
     status, dtSuggested = rk3adjoint(tCurr, myDt)
 
     if (status == false) then
       -- time-step too large
-      Lucee.logInfo (string.format("(Adjoint) ** Time step %g too large! Will retake with dt %g", myDt, dtSuggested))
+      Lucee.logInfo (string.format("** Time step %g too large! Will retake with dt %g", myDt, dtSuggested))
       -- Revert fields to previous value
       f:copy(fNewDup)
       hamilPerturbed:copy(hamilDup)
@@ -844,7 +925,6 @@ function advanceFrameAdjoint(tStart, tEnd, initDt)
 
       myDt = dtSuggested
     else
-      --calcDiagnostics(tCurr, myDt)
       tCurr = tCurr + myDt
       myDt = dtSuggested
       step = step + 1
@@ -862,6 +942,7 @@ end
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
+--f:sync()
 -- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
@@ -873,59 +954,97 @@ fBackground:copy(f)
 calcBackgroundTemperature(fBackground, 0.0, 0.0, backgroundKineticTemp)
 runUpdater(copy2dTo4d, 0.0, 0.0, {backgroundKineticTemp}, {backgroundKineticTemp4d})
 
--- keeps track of what node is being passed to initSingleNode
-globalNode = 0
--- initialize perturbation to electron distribution function
-initSingleNode = Updater.SetSingleNodeToOne4D {
-   onGrid = grid_4d,
-   basis = basis_4d,
-   shareCommonNodes = false,
-   -- function to communicate what node to set to one
-   evaluate = function (t)
-		 return globalNode
-	 end
-}
+-- Compute total perturbed distribution function using scaled fBackground
+runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
+-- Set f to perturbed f
+f:copy(fNew)
+-- Apply boundary conditions
+f:sync()
+-- Copy to fInitialPetrub again
+fInitialPerturb:copy(f)
 
--- figure out how many nodes are in the system
-totalNodes = (N_X+2)*(N_Y+2)*(N_VPARA+2)*(N_MU+2)*basis_4d:numNodes()
-print(string.format("-- Total nodes = %g",totalNodes))
-
-matrixConstructor = Updater.ConstructLinearOperatorMatrix4D {
-  onGrid = grid_4d,
-  basis = basis_4d,
-  shareCommonNodes = false,
-  totalNodes = totalNodes,
-  -- function to communicate what column to write to
-  evaluate = function (t)
-   return globalNode
-  end
-}
-
--- MAIN LOOP
-myDt = 0.1*tEnd
-for oneNode = 0, totalNodes-1 do
-  globalNode = oneNode
-  -- initialize distribution function
-  runUpdater(initSingleNode, 0.0, 0.0, {}, {f})
-  -- Apply boundary conditions
-  applyBcToPerturbedDistF(f)
+-- function to take one complete step of adjoint algorithm
+function adjointSingleIteration(currIter, tEndIter)
   -- Compute initial potential with perturbation added
   calcPotential(phi2d, f)
   runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
   phi2dSmoothed:sync()
   calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
-  -- compute df/dt
+  -- calculate free energy at time 0
+  if (currIter == 0) then
+    calcFreeEnergy(2*currIter, 0.0, f, tempFreeEnergy)
+    W_0 = tempFreeEnergy:lastInsertedData()
+  end
+  calcDiagnostics(0.0, 0.0)
+  -- perform standard iteration to time tEndIter
+  Lucee.logInfo (string.format("--Iteration %g: Advancing solution from %g to %g", currIter, tStart, tEndIter))
+  dtSuggested = advanceFrame(tStart, tEndIter, dtSuggested)
+  Lucee.logInfo ("")
+  W_T_PREV = W_T
+  W_T = freeEnergy:lastInsertedData()
+  
+  -- recompute initial potential and hamiltonian with scaled f
+  calcPotential(phi2d, f)
+  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
+  phi2dSmoothed:sync()
+  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
+  -- calculate initial adjoint potential
+  calcAdjointPotential(0.0, 0.0, f, adjointPotential)
+  runUpdater(copy2dTo4d, 0.0, 0.0, {adjointPotential}, {adjointPotential4d})
+  runUpdater(copy2dTo4d, 0.0, 0.0, {phi2dSmoothed}, {phi4dSmoothed})
+  adjointPotential4d:sync()
+  phi4dSmoothed:sync()
+
+  Lucee.logInfo (string.format("--Iteration %g: (Adjoint) Advancing solution from %g to %g", currIter, tEndIter, tStart))
+  dtSuggested = advanceFrameAdjoint(tStart, tEndIter, dtSuggested)
+  Lucee.logInfo ("")
+  
+  calcFreeEnergy(2*currIter+1, 0.0, f, tempFreeEnergy)
+  W_0_NEW = tempFreeEnergy:lastInsertedData()
+  -- calculate f at time 0
+  f:scale(math.sqrt(W_0/W_0_NEW))
+  
+  -- check for convergence
+  if currIter == 0 or math.abs((W_T-W_T_PREV)/W_T_PREV) > iterTol then
+    if currIter ~= 0 then
+      Lucee.logInfo (string.format("-- Convergence factor = %g", math.abs((W_T-W_T_PREV)/W_T_PREV)))
+    end
+    return false
+  else
+    return true
+  end
+end
+
+timePoints = 5 -- number of points to optimize free energy growth
+-- build array of times to optimize free energy growth
+tEndArray = {}
+for i = 1,timePoints do
+  tEndArray[i] = i*tEnd/timePoints
+end
+
+for i,tEndVal in ipairs(tEndArray) do
+
+  iterCounter = 0
   repeat
-    Lucee.logInfo (string.format("-- Step for node %g", oneNode))
-    myStatusOne, myDtSuggestedOne = runUpdater(pbSlvrOne, 0.0, myDt, {f, hamilBackground}, {f1Intermediate})
-    f1:copy(f1Intermediate)
-    myStatusTwo, myDtSuggestedTwo = runUpdater(pbSlvrTwo, 0.0, myDt, {fBackground, hamilPerturbed}, {f1Intermediate})
-    f1:accumulate(1.0, f1Intermediate)
-    myDt = math.min(myDtSuggestedOne, myDtSuggestedTwo)
-  until (myStatusOne == true and myStatusTwo == true)
+    convergenceStatus = adjointSingleIteration(iterCounter, tEndVal)
+    -- need to write to temporary file to clear freeEnergy dynvector
+    freeEnergy:write( string.format("freeEnergy.h5"), tEndVal)
+    --freeEnergy:write( string.format("freeEnergy_%d.h5", iterCounter), tEndVal)
+    iterCounter = iterCounter + 1
+  until convergenceStatus == true
+  -- final iteration to write out a free energy vs time curve for optimized curv
+  Lucee.logInfo (string.format("-- Took %g iterations", iterCounter))
+  calcDiagnostics(0.0, 0.0)
+  calcPotential(phi2d, f)
+  runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
+  phi2dSmoothed:sync()
+  calcPerturbedHamiltonian(phi2dSmoothed, hamilPerturbed)
+  -- perform standard iteration to time tEnd
+  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tStart, tEnd))
+  dtSuggested = advanceFrame(tStart, tEnd, dtSuggested)
+  Lucee.logInfo ("")
+  freeEnergy:write( string.format("freeEnergy_%d.h5", i-1), tEnd)
 
-  applyBcToPerturbedDistF(f1)
-
-  -- put df/dt in appropriate matrix element of linear operator matrix
-  runUpdater(matrixConstructor, 0.0, myDt, {f1}, {})
+  -- Revert f to initial condition before any iterations
+  f:copy(fInitialPerturb)
 end
