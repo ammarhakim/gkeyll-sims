@@ -60,7 +60,7 @@ vtIon = math.sqrt(tPed*eV/ionMass)
 -- Pedestal sound speed (m/s)
 cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
-Sn   = A*nPed*cPed/lSource
+Sn   = A*nPed*cPed/lSource*122/400 -- scaled by pitts 122 kJ ELM
 -- number of cells
 N_Z, N_VPARA, N_MU = 8, 16, 8
 -- domain extents
