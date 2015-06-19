@@ -9,7 +9,7 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 10e-6
+tEnd = 350e-6
 nFrames = 5
 
 -- physical constants
@@ -33,7 +33,7 @@ nPed = 5e19
 -- pedestal (source) temperature (eV)
 tPed = 1500
 -- Fixed value of Te that must be independent of time (eV)
-Te0 = 100
+Te0 = 50
 -- ELM pulse duration (seconds)
 tELM = 200e-6
 -- Parallel length (m)
@@ -312,9 +312,9 @@ end
 
 -- Return initial Ti(x) in eV
 function initialIonTemp(x)
-  local backgroundTemp = 100 + 45*(1 - math.abs(x/lParallel))
+  local backgroundTemp = 40 + 15*(1 - math.abs(x/lParallel))
   if math.abs(x) < lSource/2 then
-       backgroundTemp = backgroundTemp + 30*math.cos(math.pi*x/lSource)
+       backgroundTemp = backgroundTemp + 15*math.cos(math.pi*x/lSource)
      end
   return backgroundTemp
 end
@@ -730,7 +730,7 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdges3DUpdater {
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 3, }
 -- dynvector for sheath power transmission coefficients
-sheathCoefficients = DataStruct.DynVector { numComponents = 3, }
+sheathCoefficients = DataStruct.DynVector { numComponents = 5, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdge3DUpdater {
@@ -981,14 +981,17 @@ function rk3(tCurr, myDt)
   distf1Elc:accumulate(myDt, distfCollisionsElc)
 
   pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distfIon, hamilIon}, {distf1Ion})
+  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distfIon, driftUIon}, {distfCollisionsIon})
+  distf1Ion:accumulate(myDt, distfCollisionsIon)
+  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distfIon, vThermSq3dIon}, {distfCollisionsIon})
+  distf1Ion:accumulate(myDt, distfCollisionsIon)
 
-  statusElc = (statusElc and dragStatusElc) and diffStatusElc
-  statusIon = pbStatusIon
+  statusElc = (pbStatusElc and dragStatusElc) and diffStatusElc
+  statusIon = (pbStatusIon and dragStatusIon) and diffStatusIon
   dtSuggestedElc = math.min(pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc)
-  dtSuggestedIon = pbDtSuggestedIon
+  dtSuggestedIon = math.min(pbDtSuggestedIon, dragDtSuggestedIon, diffDtSuggestedIon)
 
   if (statusElc == false) or (statusIon == false) then
-    print(string.format("pbElc = %e\n dragElc = %e\n diffElc = %e\n",pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc))
     return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
@@ -1015,14 +1018,17 @@ function rk3(tCurr, myDt)
   distfNewElc:accumulate(myDt, distfCollisionsElc)
 
   pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
+  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distf1Ion, driftUIon}, {distfCollisionsIon})
+  distfNewIon:accumulate(myDt, distfCollisionsIon)
+  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distf1Ion, vThermSq3dIon}, {distfCollisionsIon})
+  distfNewIon:accumulate(myDt, distfCollisionsIon)
 
-  statusElc = (statusElc and dragStatusElc) and diffStatusElc
-  statusIon = pbStatusIon
+  statusElc = (pbStatusElc and dragStatusElc) and diffStatusElc
+  statusIon = (pbStatusIon and dragStatusIon) and diffStatusIon
   dtSuggestedElc = math.min(pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc)
-  dtSuggestedIon = pbDtSuggestedIon
+  dtSuggestedIon = math.min(pbDtSuggestedIon, dragDtSuggestedIon, diffDtSuggestedIon)
 
   if (statusElc == false) or (statusIon == false) then
-    print(string.format("pbElc = %e\n dragElc = %e\n diffElc = %e\n",pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc))
     return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
@@ -1052,14 +1058,17 @@ function rk3(tCurr, myDt)
   distfNewElc:accumulate(myDt, distfCollisionsElc)
 
   pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
+  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distf1Ion, driftUIon}, {distfCollisionsIon})
+  distfNewIon:accumulate(myDt, distfCollisionsIon)
+  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distf1Ion, vThermSq3dIon}, {distfCollisionsIon})
+  distfNewIon:accumulate(myDt, distfCollisionsIon)
 
-  statusElc = (statusElc and dragStatusElc) and diffStatusElc
-  statusIon = pbStatusIon
+  statusElc = (pbStatusElc and dragStatusElc) and diffStatusElc
+  statusIon = (pbStatusIon and dragStatusIon) and diffStatusIon
   dtSuggestedElc = math.min(pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc)
-  dtSuggestedIon = pbDtSuggestedIon
+  dtSuggestedIon = math.min(pbDtSuggestedIon, dragDtSuggestedIon, diffDtSuggestedIon)
 
   if (statusElc == false) or (statusIon == false) then
-    print(string.format("pbElc = %e\n dragElc = %e\n diffElc = %e\n",pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc))
     return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
