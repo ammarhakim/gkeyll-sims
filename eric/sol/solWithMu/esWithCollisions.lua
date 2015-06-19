@@ -587,29 +587,6 @@ function getIonAlpha(t)
   return logLambda*eV^4*avgIonDensity/(12*math.pi^(3/2)*eps0^2*math.sqrt(ionMass)*(avgIonTemp)^(3/2))
 end
 
-diffSlvrIon = Updater.LenardBernsteinDiff3DUpdater {
-  onGrid = gridIon,
-  basis = basisIon,
-  cfl = cfl,
-  onlyIncrement = true,
-  B0 = B0,
-  speciesMass = ionMass,
-  alpha = function(t)
-    return getIonAlpha(t)
-  end
-}
-
-dragSlvrIon = Updater.LenardBernsteinDrag3DUpdater {
-  onGrid = gridIon,
-  basis = basisIon,
-  basis1d = basis_1d,
-  cfl = cfl,
-  onlyIncrement = true,
-  alpha = function(t)
-    return getIonAlpha(t)
-  end
-}
-
 diffSlvrElc = Updater.LenardBernsteinDiff3DUpdater {
   onGrid = gridElc,
   basis = basisElc,
