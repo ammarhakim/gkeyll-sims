@@ -44,7 +44,7 @@ L_T       = R/2
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 1
-N_Y = 4
+N_Y = 8
 N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
@@ -55,7 +55,7 @@ Y_UPPER = deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/B0
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)

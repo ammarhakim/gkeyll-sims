@@ -1,4 +1,5 @@
 -- Input file for SOL problem with kinetic ions and electrons (1d2v) with lb collisions
+-- 6-18-2015: parameters have been altered to try to mimic Pitts 2007 paper
 
 -- polynomial order
 polyOrder = 2
@@ -8,7 +9,7 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 350e-6
+tEnd = 10e-6
 nFrames = 5
 
 -- physical constants
@@ -32,7 +33,7 @@ nPed = 5e19
 -- pedestal (source) temperature (eV)
 tPed = 1500
 -- Fixed value of Te that must be independent of time (eV)
-Te0 = 75
+Te0 = 100
 -- ELM pulse duration (seconds)
 tELM = 200e-6
 -- Parallel length (m)
@@ -270,17 +271,15 @@ mom1MuCalcIon = Updater.DistFuncMomentCalc1DFrom3D {
 }
 
 function maxwellian(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/mass)
-  return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
-    math.exp(-mu*B0/(tPed*eV))
+  return 1/(2*Lucee.Pi*vt^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
+    math.exp(-mu*B0/(mass*vt^2))
 end
 
 -- Maxwellian (Right half only)
 function maxwellianRight(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/mass)
   if vPara >=0 then
-    return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
-      math.exp(-mu*B0/(tPed*eV))
+    return 1/(2*Lucee.Pi*vt^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
+      math.exp(-mu*B0/(mass*vt^2))
   else
     return 0
   end
@@ -288,10 +287,9 @@ end
 
 -- Maxwellian (Left half only)
 function maxwellianLeft(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/mass)
   if vPara <= 0 then
-    return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
-      math.exp(-mu*B0/(tPed*eV))
+    return 1/(2*Lucee.Pi*vt^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
+      math.exp(-mu*B0/(mass*vt^2))
   else
     return 0
   end
@@ -630,29 +628,6 @@ dragSlvrElc = Updater.LenardBernsteinDrag3DUpdater {
   onlyIncrement = true,
   alpha = function(t)
     return getElcAlpha(t)
-  end
-}
-
-diffSlvrIon = Updater.LenardBernsteinDiff3DUpdater {
-  onGrid = gridIon,
-  basis = basisIon,
-  cfl = cfl,
-  onlyIncrement = true,
-  B0 = B0,
-  speciesMass = ionMass,
-  alpha = function(t)
-    return getIonAlpha(t)
-  end
-}
-
-dragSlvrIon = Updater.LenardBernsteinDrag3DUpdater {
-  onGrid = gridIon,
-  basis = basisIon,
-  basis1d = basis_1d,
-  cfl = cfl,
-  onlyIncrement = true,
-  alpha = function(t)
-    return getIonAlpha(t)
   end
 }
 
@@ -1006,17 +981,14 @@ function rk3(tCurr, myDt)
   distf1Elc:accumulate(myDt, distfCollisionsElc)
 
   pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distfIon, hamilIon}, {distf1Ion})
-  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distfIon, driftUIon}, {distfCollisionsIon})
-  distf1Ion:accumulate(myDt, distfCollisionsIon)
-  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distfIon, vThermSq3dIon}, {distfCollisionsIon})
-  distf1Ion:accumulate(myDt, distfCollisionsIon)
 
-  statusElc = (pbStatusElc and dragStatusElc) and diffStatusElc
-  statusIon = (pbStatusIon and dragStatusIon) and diffStatusIon
+  statusElc = (statusElc and dragStatusElc) and diffStatusElc
+  statusIon = pbStatusIon
   dtSuggestedElc = math.min(pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc)
-  dtSuggestedIon = math.min(pbDtSuggestedIon, dragDtSuggestedIon, diffDtSuggestedIon)
+  dtSuggestedIon = pbDtSuggestedIon
 
   if (statusElc == false) or (statusIon == false) then
+    print(string.format("pbElc = %e\n dragElc = %e\n diffElc = %e\n",pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc))
     return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
@@ -1043,17 +1015,14 @@ function rk3(tCurr, myDt)
   distfNewElc:accumulate(myDt, distfCollisionsElc)
 
   pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
-  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distf1Ion, driftUIon}, {distfCollisionsIon})
-  distfNewIon:accumulate(myDt, distfCollisionsIon)
-  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distf1Ion, vThermSq3dIon}, {distfCollisionsIon})
-  distfNewIon:accumulate(myDt, distfCollisionsIon)
 
-  statusElc = (pbStatusElc and dragStatusElc) and diffStatusElc
-  statusIon = (pbStatusIon and dragStatusIon) and diffStatusIon
+  statusElc = (statusElc and dragStatusElc) and diffStatusElc
+  statusIon = pbStatusIon
   dtSuggestedElc = math.min(pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc)
-  dtSuggestedIon = math.min(pbDtSuggestedIon, dragDtSuggestedIon, diffDtSuggestedIon)
+  dtSuggestedIon = pbDtSuggestedIon
 
   if (statusElc == false) or (statusIon == false) then
+    print(string.format("pbElc = %e\n dragElc = %e\n diffElc = %e\n",pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc))
     return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
@@ -1083,17 +1052,14 @@ function rk3(tCurr, myDt)
   distfNewElc:accumulate(myDt, distfCollisionsElc)
 
   pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
-  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distf1Ion, driftUIon}, {distfCollisionsIon})
-  distfNewIon:accumulate(myDt, distfCollisionsIon)
-  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distf1Ion, vThermSq3dIon}, {distfCollisionsIon})
-  distfNewIon:accumulate(myDt, distfCollisionsIon)
 
-  statusElc = (pbStatusElc and dragStatusElc) and diffStatusElc
-  statusIon = (pbStatusIon and dragStatusIon) and diffStatusIon
+  statusElc = (statusElc and dragStatusElc) and diffStatusElc
+  statusIon = pbStatusIon
   dtSuggestedElc = math.min(pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc)
-  dtSuggestedIon = math.min(pbDtSuggestedIon, dragDtSuggestedIon, diffDtSuggestedIon)
+  dtSuggestedIon = pbDtSuggestedIon
 
   if (statusElc == false) or (statusIon == false) then
+    print(string.format("pbElc = %e\n dragElc = %e\n diffElc = %e\n",pbDtSuggestedElc, dragDtSuggestedElc, diffDtSuggestedElc))
     return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
