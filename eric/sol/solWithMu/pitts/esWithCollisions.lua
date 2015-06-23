@@ -9,7 +9,7 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 350e-6
+tEnd = 0.75e-6
 nFrames = 5
 
 -- physical constants
@@ -33,7 +33,7 @@ nPed = 5e19
 -- pedestal (source) temperature (eV)
 tPed = 1500
 -- Fixed value of Te that must be independent of time (eV)
-Te0 = 50
+Te0 = 75
 -- ELM pulse duration (seconds)
 tELM = 200e-6
 -- Parallel length (m)
@@ -1148,6 +1148,7 @@ copyCToD1d = Updater.CopyContToDisCont1D {
 function writeFields(frameNum, tCurr)
    numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
    numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
+   mom1ParaElc:write( string.format("mom1ParaElc_%d.h5", frameNum), tCurr)
    --distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)

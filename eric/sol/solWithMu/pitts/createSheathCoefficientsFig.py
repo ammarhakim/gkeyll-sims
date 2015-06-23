@@ -47,9 +47,9 @@ for idx in range(1,filenumEnd+1):
   dataVals = fh.root.DataStruct.data.read()
   axarr[2].semilogx(timeVals, 0.5*elcMass/eV*dataVals[:,1]**2,'b') # (Sheath Potential)
 
-axarr[0].legend(['Total','Ions','Electrons'],loc='upper left')
+axarr[0].legend(['Total','Ions','Electrons'],loc='upper right')
 #ax1 = plt.subplot(211)
-axarr[0].set_ylim(0,20)
+axarr[0].set_ylim(0,40)
 axarr[1].set_ylim(0,1600)
 axarr[1].set_xlim(0.5, 350)
 axarr[0].set_title('Sheath Transmission Coefficient')

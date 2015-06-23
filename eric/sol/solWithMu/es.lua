@@ -674,7 +674,7 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdges3DUpdater {
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 3, }
 -- dynvector for sheath power transmission coefficients
-sheathCoefficients = DataStruct.DynVector { numComponents = 3, }
+sheathCoefficients = DataStruct.DynVector { numComponents = 5, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdge3DUpdater {
