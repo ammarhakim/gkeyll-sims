@@ -937,6 +937,16 @@ function applyBc(curr, dt, fldElc, fldIon, cutoffV)
   -- (zero flux bc's applied via poisson updater)
 end
 
+-- Output dynvector for computing wall electron temperature
+wallElcTemp = DataStruct.DynVector { numComponents = 1, }
+wallElcTempCalc = Updater.SOL3DElectronTempAtWallCalc {
+  onGrid = gridElc,
+  basis = basisElc,
+  elcMass = elcMass,
+  eV = eV,
+  B0 = B0,
+}
+
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   -- compute moments at edges
@@ -953,7 +963,7 @@ function calcDiagnostics(curr, dt)
   tIon:scale(ionMass/eV)
   -- compute heat flux at edges
   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
-  momentsAtEdgesIon, tElc, tIon}, {heatFluxAtEdge, sheathCoefficients})
+  momentsAtEdgesIon, tElc, tIon, wallElcTemp}, {heatFluxAtEdge, sheathCoefficients})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme

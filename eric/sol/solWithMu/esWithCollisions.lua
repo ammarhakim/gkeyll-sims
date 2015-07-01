@@ -732,7 +732,7 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdges3DUpdater {
 -- dynvector for heat flux at edge
 heatFluxAtEdge = DataStruct.DynVector { numComponents = 3, }
 -- dynvector for sheath power transmission coefficients
-sheathCoefficients = DataStruct.DynVector { numComponents = 3, }
+sheathCoefficients = DataStruct.DynVector { numComponents = 5, }
 
 -- to compute total particle energy
 heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdge3DUpdater {
@@ -937,6 +937,16 @@ function applyBc(curr, dt, fldElc, fldIon, cutoffV)
   -- (zero flux bc's applied via poisson updater)
 end
 
+-- Output dynvector for computing wall electron temperature
+wallElcTemp = DataStruct.DynVector { numComponents = 1, }
+wallElcTempCalc = Updater.SOL3DElectronTempAtWallCalc {
+  onGrid = gridElc,
+  basis = basisElc,
+  elcMass = elcMass,
+  eV = eV,
+  B0 = B0,
+}
+
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   -- compute moments at edges
@@ -951,9 +961,11 @@ function calcDiagnostics(curr, dt)
   tElc:scale(elcMass/eV)
   tIon:copy(vThermSqIon)
   tIon:scale(ionMass/eV)
+  -- compute electron temperature at wall
+  runUpdater(wallElcTempCalc, curr, dt, {distfElc, cutoffVelocities}, {wallElcTemp})
   -- compute heat flux at edges
   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
-  momentsAtEdgesIon, tElc, tIon}, {heatFluxAtEdge, sheathCoefficients})
+  momentsAtEdgesIon, tElc, tIon, wallElcTemp}, {heatFluxAtEdge, sheathCoefficients})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
