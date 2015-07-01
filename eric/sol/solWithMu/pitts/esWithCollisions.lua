@@ -9,7 +9,7 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 0.75e-6
+tEnd = 5e-6
 nFrames = 5
 
 -- physical constants
@@ -637,6 +637,16 @@ cutoffVelocities = DataStruct.DynVector { numComponents = 2, }
 cutoffVelocities1 = DataStruct.DynVector { numComponents = 2, }
 cutoffVelocities2 = DataStruct.DynVector { numComponents = 2, }
 
+-- Output dynvector for computing wall electron temperature
+wallElcTemp = DataStruct.DynVector { numComponents = 1, }
+wallElcTempCalc = Updater.SOL3DElectronTempAtWallCalc {
+  onGrid = gridElc,
+  basis = basisElc,
+  elcMass = elcMass,
+  eV = eV,
+  B0 = B0,
+}
+
 -- compute moments from distribution function
 function calcMoments(curr, dt, distfElcIn, distfIonIn)
   -- moment 0
@@ -948,10 +958,12 @@ function calcDiagnostics(curr, dt)
   tElc:copy(vThermSqElc)
   tElc:scale(elcMass/eV)
   tIon:copy(vThermSqIon)
-  tIon:scale(ionMass/eV)
+  tIon:scale(ionMass/eV) 
+  -- compute electron temperature at wall
+  runUpdater(wallElcTempCalc, curr, dt, {distfElc, cutoffVelocities}, {wallElcTemp})
   -- compute heat flux at edges
   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
-  momentsAtEdgesIon, tElc, tIon}, {heatFluxAtEdge, sheathCoefficients})
+  momentsAtEdgesIon, tElc, tIon, wallElcTemp}, {heatFluxAtEdge, sheathCoefficients})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -1155,6 +1167,7 @@ function writeFields(frameNum, tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
+   wallElcTemp:write( string.format("wallElcTemp_%d.h5", frameNum) ,tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
