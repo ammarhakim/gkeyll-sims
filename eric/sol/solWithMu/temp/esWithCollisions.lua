@@ -1,4 +1,5 @@
 -- Input file for SOL problem with kinetic ions and electrons (1d2v) with lb collisions
+-- 7-1-2015: Testing standard (Havlickova) SOL problem
 
 -- polynomial order
 polyOrder = 2
