@@ -1,5 +1,6 @@
 -- Input file for SOL problem with kinetic ions and electrons (1d2v) with lb collisions
 -- 6-24-2015: starting from sol/solWithMu/esWithCollisions.lua, convert to do recycling problem
+-- 7-5-2015: recycling coefficient = 0
 
 -- polynomial order
 polyOrder = 2
@@ -9,8 +10,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 10e-6
-nFrames = 5
+tEnd = 1000e-6
+nFrames = 10
 
 -- physical constants
 -- eletron mass (kg)
@@ -41,7 +42,7 @@ lSource = 25
 -- Recycling decay length scale (m)
 lRecycling = 4
 -- Source temperature (eV)
-tempSource = 1
+tempSource = 30
 -- Magnetic field (Tesla)
 B0 = 2
 -- Recycling fraction
@@ -66,7 +67,7 @@ cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
 Sn   = A*nPed*cPed/lSource/100
 -- number of cells
-N_Z, N_VPARA, N_MU = 12, 32, 16
+N_Z, N_VPARA, N_MU = 12, 16, 8
 -- domain extents
 Z_LOWER, Z_UPPER = -lParallel, lParallel
 -- electron velocity extents
@@ -1206,10 +1207,14 @@ function writeFields(frameNum, tCurr)
    distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
-   --heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
-   --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
-   --sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
 end
+
+distfElcFileName = "distfElc_0.h5"
+distfIonFileName = "distfIon_0.h5"
+distfElc:read(distfElcFileName)
+distfIon:read(distfIonFileName)
+distfElc:sync()
+distfIon:sync()
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
 -- apply boundary conditions to both fields
@@ -1237,18 +1242,10 @@ dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 tFrame = (tEnd-tStart)/nFrames
 tCurr = tStart
 
-runUpdater(mom0CalcElc, 0.0, 0.0, {recyclingSourceElc}, {recyclingSourceElcProfile})
-recyclingSourceElcProfile:scale(2*math.pi*B0/elcMass)
-recyclingSourceElcProfile:write( string.format("recyclingSourceElcProfile_%d.h5", 0), 0)
-
-calcMoments(0.0, 0.0, recyclingSourceElc, recyclingSourceIon)
-calcDiagnostics(0.0, 0.0)
-writeFields(0, 0.0)
-
---for frame = 1, nFrames do
---   Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
---   dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
---   writeFields(frame, tCurr+tFrame)
---   tCurr = tCurr+tFrame
---   Lucee.logInfo ("")
---end
+for frame = 1, nFrames do
+   Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
+   dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
+   writeFields(frame, tCurr+tFrame)
+   tCurr = tCurr+tFrame
+   Lucee.logInfo ("")
+end

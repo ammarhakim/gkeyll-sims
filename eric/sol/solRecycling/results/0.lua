@@ -60,8 +60,8 @@ rho_i = c_i/Omega_i
 -- k_perpendicular
 kPerp = kPerpTimesRho/rho_i
 -- thermal velocities
-vtElc = math.sqrt(250*eV/elcMass)
-vtIon = math.sqrt(250*eV/ionMass)
+vtElc = math.sqrt(tPed*eV/elcMass)
+vtIon = math.sqrt(tPed*eV/ionMass)
 -- Pedestal sound speed (m/s)
 cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
