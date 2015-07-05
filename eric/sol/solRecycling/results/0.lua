@@ -1,5 +1,6 @@
 -- Input file for SOL problem with kinetic ions and electrons (1d2v) with lb collisions
 -- 6-24-2015: starting from sol/solWithMu/esWithCollisions.lua, convert to do recycling problem
+-- 7-5-2015: recycling coefficient = 0
 
 -- polynomial order
 polyOrder = 2
@@ -9,8 +10,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 40e-6
-nFrames = 5
+tEnd = 1000e-6
+nFrames = 10
 
 -- physical constants
 -- eletron mass (kg)
@@ -1203,12 +1204,9 @@ function writeFields(frameNum, tCurr)
    numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
    tElc:write( string.format("tElc_%d.h5", frameNum), tCurr)
    tIon:write( string.format("tIon_%d.h5", frameNum), tCurr)
-   --distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
-   --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
-   phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
-   --heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
-   --cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
-   --sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
+   distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
+   distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
+   --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
 end
 
 calcMoments(0.0, 0.0, distfElc, distfIon)
