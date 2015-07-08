@@ -6,12 +6,12 @@
 #PBS -M eshi@pppl.gov 
 #PBS -l nodes=1:ppn=1 
 #PBS -l mem=8000mb 
-#PBS -l walltime=32:00:00
+#PBS -l walltime=48:00:00
 #PBS -r n
 #PBS -V 
 #PBS -j oe 
  
-CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i 5.lua -pc_type lu" 
+CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i 5.lua -pc_type lu -r 19" 
 cd $PBS_O_WORKDIR 
 $CMD 
 exit
