@@ -156,7 +156,7 @@ function fProfile(x,y,v,mu)
 end
 
 -- initialize electron distribution function
-initKineticF = Updater.EvalOnNodes4D {
+initKineticF = Updater.ProjectOnNodalBasis4D {
    onGrid = grid_4d,
    basis = basis_4d,
    shareCommonNodes = false,
@@ -168,7 +168,7 @@ initKineticF = Updater.EvalOnNodes4D {
 runUpdater(initKineticF, 0.0, 0.0, {}, {f})
 
 -- initialize perturbation to electron distribution function
-initKineticFPerturb = Updater.EvalOnNodes4D {
+initKineticFPerturb = Updater.ProjectOnNodalBasis4D {
    onGrid = grid_4d,
    basis = basis_4d,
    shareCommonNodes = false,
