@@ -6,9 +6,10 @@
 -- 4-23-2015: parallel version
 -- 5-1-2015: debugged known issues so far
 -- 7-9-2015: starting with adjointSims/parSims/parTest.lua
+-- 7-9-2015: same as 2.lua, but longer to see if a growing mode appears
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 4, 8, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 4, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -23,7 +24,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 10e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 5
+nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -45,12 +46,12 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/4 -- (3.935 measured)
+L_T       = R/3
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 1
 N_Y = 8
-N_VPARA = 32
+N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
