@@ -12,8 +12,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 3000e-6
-nFrames = 30
+tEnd = 5000e-6
+nFrames = 50
 
 -- physical constants
 -- eletron mass (kg)
@@ -1248,7 +1248,7 @@ calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
 -- compute initial diagnostics
 calcDiagnostics(0.0, 0.0)
 -- write out initial conditions
-writeFields(0, 0.0)
+writeFields(startFrame-1, tCurr)
 -- make a duplicate in case we need it
 distfDupElc = distfElc:duplicate()
 distfDupIon = distfIon:duplicate()
