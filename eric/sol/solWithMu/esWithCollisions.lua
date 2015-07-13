@@ -8,8 +8,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 350e-6
-nFrames = 5
+tEnd = 1e-6
+nFrames = 1
 
 -- physical constants
 -- eletron mass (kg)
@@ -715,8 +715,12 @@ setPhiAtBoundaryCalc = Updater.SetPhiAtBoundaryUpdater {
 }
 
 -- Dynvectors to store 0-3rd moments at left and right edges
-momentsAtEdgesElc = DataStruct.DynVector { numComponents = 3, }
-momentsAtEdgesIon = DataStruct.DynVector { numComponents = 3, }
+momentsAtEdgesElc = DataStruct.DynVector { numComponents = 6, }
+momentsAtEdgesIon = DataStruct.DynVector { numComponents = 6, }
+-- For RK stages
+momentsAtEdgesIonRK1 = DataStruct.DynVector { numComponents = 6, }
+momentsAtEdgesIonRK2 = DataStruct.DynVector { numComponents = 6, }
+momentsAtEdgesIonRK3 = DataStruct.DynVector { numComponents = 6, }
 
 momentsAtEdgesElcCalc = Updater.MomentsAtEdges3DUpdater {
   onGrid = gridElc,
@@ -927,14 +931,15 @@ reflectingBc = Updater.SOL3DElectrostaticDistFuncReflectionBc {
    basis1d = basis_1d,
    edge = "both",
    scaleFactor = 2*math.pi*B0/elcMass,
+   computeCutoffVelocities = true,
 }
 
 -- apply boundary conditions
-function applyBc(curr, dt, fldElc, fldIon, cutoffV)
+function applyBc(curr, dt, fldElc, fldIon, momentsAtEdgesIon, cutoffV)
   runUpdater(bcLowerIon, curr, dt, {}, {fldIon})
   runUpdater(bcUpperIon, curr, dt, {}, {fldIon})
   -- Use reflecting BC for the electrons
-  runUpdater(reflectingBc, curr, dt, {mom1ParaIon}, {fldElc, cutoffV})
+  runUpdater(reflectingBc, curr, dt, {momentsAtEdgesIon}, {fldElc, cutoffV})
   -- (zero flux bc's applied via poisson updater)
 end
 
@@ -951,8 +956,8 @@ wallElcTempCalc = Updater.SOL3DElectronTempAtWallCalc {
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   -- compute moments at edges
-  runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc, hamilElcKeDg}, {momentsAtEdgesElc})
-  runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon, hamilIonKeDg}, {momentsAtEdgesIon})
+  runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc}, {momentsAtEdgesElc})
+  runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon}, {momentsAtEdgesIon})
   -- modify phi so that is is equal to phi_s at edge
   -- TODO: change it so it takes phi1dDg as input instead of phi1d
   runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
@@ -1015,7 +1020,8 @@ function rk3(tCurr, myDt)
 
   calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
   -- apply boundary conditions to both fields
-  applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities1)
+  runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distf1Ion}, {momentsAtEdgesIonRK1})
+  applyBc(tCurr, myDt, distf1Elc, distf1Ion, momentsAtEdgesIonRK1, cutoffVelocities1)
 
   runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon}, {phi1d})
   -- Copy the continuous phi back onto a dg field
@@ -1055,7 +1061,8 @@ function rk3(tCurr, myDt)
 
   calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
   -- apply boundary conditions to both fields
-  applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities2)
+  runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distf1Ion}, {momentsAtEdgesIonRK2})
+  applyBc(tCurr, myDt, distf1Elc, distf1Ion, momentsAtEdgesIonRK2, cutoffVelocities2)
 
   runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon}, {phi1d})
   -- Copy the continuous phi back onto a dg field
@@ -1095,7 +1102,8 @@ function rk3(tCurr, myDt)
 
   calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
   -- apply boundary conditions to both fields
-  applyBc(tCurr, myDt, distf1Elc, distf1Ion, cutoffVelocities)
+  runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distf1Ion}, {momentsAtEdgesIonRK3})
+  applyBc(tCurr, myDt, distf1Elc, distf1Ion, momentsAtEdgesIonRK3, cutoffVelocities)
 
   distfElc:copy(distf1Elc)
   distfIon:copy(distf1Ion)
@@ -1170,10 +1178,13 @@ function writeFields(frameNum, tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
 end
-
+calcMoments(0.0, 0.0, distfElc, distfIon)
+-- Scale initial ion distribution function so total number of ions = total number of electrons
+distfIon:scale(integratedNumDensityElc:lastInsertedData()/integratedNumDensityIon:lastInsertedData())
 calcMoments(0.0, 0.0, distfElc, distfIon)
 -- apply boundary conditions to both fields
-applyBc(0.0, 0.0, distfElc, distfIon, cutoffVelocities)
+runUpdater(momentsAtEdgesIonCalc, 0.0, 0.0, {distfIon}, {momentsAtEdgesIonRK1})
+applyBc(0.0, 0.0, distfElc, distfIon, momentsAtEdgesIonRK1, cutoffVelocities)
 
 -- calculate initial phi
 runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
