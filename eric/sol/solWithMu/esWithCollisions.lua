@@ -60,7 +60,6 @@ vtIon = math.sqrt(tPed*eV/ionMass)
 cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
 Sn   = A*nPed*cPed/lSource
-print(Sn)
 -- number of cells
 N_Z, N_VPARA, N_MU = 8, 16, 8
 -- domain extents
@@ -935,11 +934,11 @@ reflectingBc = Updater.SOL3DElectrostaticDistFuncReflectionBc {
 }
 
 -- apply boundary conditions
-function applyBc(curr, dt, fldElc, fldIon, momentsAtEdgesIon, cutoffV)
+function applyBc(curr, dt, fldElc, fldIon, momentsAtEdgesIonIn, cutoffV)
   runUpdater(bcLowerIon, curr, dt, {}, {fldIon})
   runUpdater(bcUpperIon, curr, dt, {}, {fldIon})
   -- Use reflecting BC for the electrons
-  runUpdater(reflectingBc, curr, dt, {momentsAtEdgesIon}, {fldElc, cutoffV})
+  runUpdater(reflectingBc, curr, dt, {momentsAtEdgesIonIn}, {fldElc, cutoffV})
   -- (zero flux bc's applied via poisson updater)
 end
 
