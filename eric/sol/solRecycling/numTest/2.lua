@@ -3,7 +3,7 @@
 -- 7-6-2015: from 0-3000 microseconds
 -- 7-6-2015: recycling coefficient = 0.0 again, alternative to 0.lua
 -- 7-9-2015: testing new reflection boundary condition
--- 7-9-2015: R = 0.75
+-- 7-9-2015: R = 0.0
 
 -- polynomial order
 polyOrder = 2
@@ -13,8 +13,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 4000e-6
-nFrames = 40
+tEnd = 1000e-6
+nFrames = 10
 
 -- physical constants
 -- eletron mass (kg)
