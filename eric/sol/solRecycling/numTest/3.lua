@@ -13,8 +13,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 4000e-6
-nFrames = 40
+tEnd = 1000e-6
+nFrames = 10
 
 -- physical constants
 -- eletron mass (kg)
@@ -49,7 +49,7 @@ tempSource = 150
 -- Magnetic field (Tesla)
 B0 = 2
 -- Recycling fraction
-recyclingFraction = 0
+recyclingFraction = 0.75
 -- Particle source proportionality factor
 A = 1.2
 

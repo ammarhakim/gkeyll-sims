@@ -6,7 +6,7 @@
 -- 4-23-2015: parallel version
 -- 5-1-2015: debugged known issues so far
 -- 7-9-2015: starting with adjointSims/parSims/parTest.lua
--- 7-9-2015: same as 2.lua, but longer to see if a growing mode appears
+-- 7-9-2015: same as 2.lua, but longer to see if a growing mode appears (also parallel)
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 4, 2, 1} }
