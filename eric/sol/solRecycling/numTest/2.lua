@@ -501,8 +501,12 @@ recyclingSourceUpdaterElc = Updater.ProjectOnNodalBasis3D {
   shareCommonNodes = false, -- In DG, common nodes are not shared
   -- function to use for initialization
   evaluate = function(z,vPara,mu,t)
-    return 1/(lRecycling*(1-math.exp(-lParallel/lRecycling)))*math.exp(-(lParallel-math.abs(z))/lRecycling)*
-      maxwellian(elcMass, math.sqrt(tempSource*eV/elcMass), vPara, mu)
+    if z < Z_UPPER and z > Z_LOWER then
+      return 1/(lRecycling*(1-math.exp(-lParallel/lRecycling)))*math.exp(-(lParallel-math.abs(z))/lRecycling)*
+        maxwellian(elcMass, math.sqrt(tempSource*eV/elcMass), vPara, mu)
+    else
+      return 0
+    end
   end
 }
 runUpdater(recyclingSourceUpdaterElc, 0.0, 0.0, {}, {recyclingSourceElc})
@@ -530,8 +534,12 @@ recyclingSourceUpdaterIon = Updater.ProjectOnNodalBasis3D {
   shareCommonNodes = false, -- In DG, common nodes are not shared
   -- function to use for initialization
   evaluate = function(z,vPara,mu,t)
-    return 1/(lRecycling*(1-math.exp(-lParallel/lRecycling)))*math.exp(-(lParallel-math.abs(z))/lRecycling)*
-      maxwellian(ionMass, math.sqrt(tempSource*eV/ionMass), vPara, mu)
+    if z < Z_UPPER and z > Z_LOWER then
+      return 1/(lRecycling*(1-math.exp(-lParallel/lRecycling)))*math.exp(-(lParallel-math.abs(z))/lRecycling)*
+        maxwellian(ionMass, math.sqrt(tempSource*eV/ionMass), vPara, mu)
+      else
+        return 0
+      end
   end
 }
 runUpdater(recyclingSourceUpdaterIon, 0.0, 0.0, {}, {recyclingSourceIon})
