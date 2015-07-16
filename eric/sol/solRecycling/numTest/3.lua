@@ -13,8 +13,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 1000e-6
-nFrames = 10
+tEnd = 500e-6
+nFrames = 5
 
 -- physical constants
 -- eletron mass (kg)
@@ -49,7 +49,7 @@ tempSource = 150
 -- Magnetic field (Tesla)
 B0 = 2
 -- Recycling fraction
-recyclingFraction = 0.75
+recyclingFraction = 0
 -- Particle source proportionality factor
 A = 1.2
 
@@ -501,8 +501,12 @@ recyclingSourceUpdaterElc = Updater.ProjectOnNodalBasis3D {
   shareCommonNodes = false, -- In DG, common nodes are not shared
   -- function to use for initialization
   evaluate = function(z,vPara,mu,t)
-    return 1/(lRecycling*(1-math.exp(-lParallel/lRecycling)))*math.exp(-(lParallel-math.abs(z))/lRecycling)*
-      maxwellian(elcMass, math.sqrt(tempSource*eV/elcMass), vPara, mu)
+    if z < Z_UPPER and z > Z_LOWER then
+      return 1/(lRecycling*(1-math.exp(-lParallel/lRecycling)))*math.exp(-(lParallel-math.abs(z))/lRecycling)*
+        maxwellian(elcMass, math.sqrt(tempSource*eV/elcMass), vPara, mu)
+    else
+      return 0
+    end
   end
 }
 runUpdater(recyclingSourceUpdaterElc, 0.0, 0.0, {}, {recyclingSourceElc})
@@ -530,8 +534,12 @@ recyclingSourceUpdaterIon = Updater.ProjectOnNodalBasis3D {
   shareCommonNodes = false, -- In DG, common nodes are not shared
   -- function to use for initialization
   evaluate = function(z,vPara,mu,t)
-    return 1/(lRecycling*(1-math.exp(-lParallel/lRecycling)))*math.exp(-(lParallel-math.abs(z))/lRecycling)*
-      maxwellian(ionMass, math.sqrt(tempSource*eV/ionMass), vPara, mu)
+    if z < Z_UPPER and z > Z_LOWER then
+      return 1/(lRecycling*(1-math.exp(-lParallel/lRecycling)))*math.exp(-(lParallel-math.abs(z))/lRecycling)*
+        maxwellian(ionMass, math.sqrt(tempSource*eV/ionMass), vPara, mu)
+      else
+        return 0
+      end
   end
 }
 runUpdater(recyclingSourceUpdaterIon, 0.0, 0.0, {}, {recyclingSourceIon})
@@ -768,8 +776,8 @@ setPhiAtBoundaryCalc = Updater.SetPhiAtBoundaryUpdater {
 }
 
 -- Dynvectors to store 0-3rd moments at left and right edges
-momentsAtEdgesElc = DataStruct.DynVector { numComponents = 6, }
-momentsAtEdgesIon = DataStruct.DynVector { numComponents = 6, }
+momentsAtEdgesElcWrite = DataStruct.DynVector { numComponents = 6, }
+momentsAtEdgesIonWrite = DataStruct.DynVector { numComponents = 6, }
 -- For RK stages
 momentsAtEdgesIonRK1 = DataStruct.DynVector { numComponents = 6, }
 momentsAtEdgesIonRK2 = DataStruct.DynVector { numComponents = 6, }
@@ -985,6 +993,8 @@ end
 function calcDiagnostics(curr, dt)
   runUpdater(integrateSpatialField, curr, dt, {numDensityElc}, {integratedNumDensityElcWrite})
   runUpdater(integrateSpatialField, curr, dt, {numDensityIon}, {integratedNumDensityIonWrite})
+  runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon}, {momentsAtEdgesIonWrite})
+  runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc}, {momentsAtEdgesElcWrite})
   -- modify phi so that is is equal to phi_s at edge
   -- TODO: change it so it takes phi1dDg as input instead of phi1d
   --runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
@@ -1006,7 +1016,8 @@ function rk3(tCurr, myDt)
   local pbStatusIon, pbDtSuggestedIon
   local diffStatusIon, diffDtSuggestedIon
   local dragStatusIon, dragDtSuggestedIon
-  local gammaIon, sourceAmplitude
+  local gammaIonLeft, sourceAmplitude
+  local gammaIonRight, unusedVar1, unusedVar2
 
   -- RK stage 1
   pbStatusElc, pbDtSuggestedElc = runUpdater(pbSlvrElc, tCurr, myDt, {distfElc, hamilElc}, {distf1Elc})
@@ -1032,8 +1043,9 @@ function rk3(tCurr, myDt)
 
   -- compute outward ion flux
   runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distf1Ion}, {momentsAtEdgesIonRK1})
-  gammaIon = momentsAtEdgesIonRK1:lastInsertedData()
-  sourceAmplitude = gammaIon*recyclingFraction
+  --gammaIon = momentsAtEdgesIonRK1:lastInsertedData()
+  gammaIonRight, unusedVar1, unusedVar2, gammaIonLeft = momentsAtEdgesIonRK1:lastInsertedData()
+  sourceAmplitude = 0.5*(gammaIonRight-gammaIonLeft)*recyclingFraction
 
   -- accumulate recycling sources
   distf1Elc:accumulate(myDt*sourceAmplitude, recyclingSourceElc)
@@ -1079,8 +1091,10 @@ function rk3(tCurr, myDt)
 
   -- compute outward ion flux
   runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distfNewIon}, {momentsAtEdgesIonRK2})
-  gammaIon = momentsAtEdgesIonRK2:lastInsertedData()
-  sourceAmplitude = gammaIon*recyclingFraction
+  --gammaIon = momentsAtEdgesIonRK2:lastInsertedData()
+  --sourceAmplitude = gammaIon*recyclingFraction
+  gammaIonRight, unusedVar1, unusedVar2, gammaIonLeft = momentsAtEdgesIonRK2:lastInsertedData()
+  sourceAmplitude = 0.5*(gammaIonRight-gammaIonLeft)*recyclingFraction
 
   -- accumulate recycling sources
   distfNewElc:accumulate(myDt*sourceAmplitude, recyclingSourceElc)
@@ -1129,8 +1143,10 @@ function rk3(tCurr, myDt)
 
   -- compute outward ion flux
   runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distfNewIon}, {momentsAtEdgesIonRK3})
-  gammaIon = momentsAtEdgesIonRK3:lastInsertedData()
-  sourceAmplitude = gammaIon*recyclingFraction
+  --gammaIon = momentsAtEdgesIonRK3:lastInsertedData()
+  --sourceAmplitude = gammaIon*recyclingFraction
+  gammaIonRight, unusedVar1, unusedVar2, gammaIonLeft = momentsAtEdgesIonRK3:lastInsertedData()
+  sourceAmplitude = 0.5*(gammaIonRight-gammaIonLeft)*recyclingFraction
 
   -- accumulate recycling sources
   distfNewElc:accumulate(myDt*sourceAmplitude, recyclingSourceElc)
@@ -1221,8 +1237,16 @@ function writeFields(frameNum, tCurr)
    mom1ParaIon:write( string.format("mom1ParaIon_%d.h5", frameNum), tCurr)
    integratedNumDensityElcWrite:write( string.format("nTotalElc_%d.h5", frameNum), tCurr)
    integratedNumDensityIonWrite:write( string.format("nTotalIon_%d.h5", frameNum), tCurr)
+   momentsAtEdgesIonWrite:write( string.format("momAtEdgeIon_%d.h5", frameNum), tCurr)
+   momentsAtEdgesElcWrite:write( string.format("momAtEdgeElc_%d.h5", frameNum), tCurr)
    --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
 end
+
+-- testing code
+calcMoments(0.0, 0.0, recyclingSourceElc, recyclingSourceIon)
+recyclingSourceElc:scale(2/integratedNumDensityElc:lastInsertedData())
+recyclingSourceIon:scale(2/integratedNumDensityIon:lastInsertedData())
+-- end testing code
 
 -- parameters to control time-stepping
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
