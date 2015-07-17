@@ -3,7 +3,7 @@
 -- 7-6-2015: from 0-3000 microseconds
 -- 7-6-2015: recycling coefficient = 0.0 again, alternative to 0.lua
 -- 7-9-2015: testing new reflection boundary condition
--- 7-9-2015: R = 0
+-- 7-9-2015: R = 0.75
 
 -- polynomial order
 polyOrder = 2
@@ -13,8 +13,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 5e-6
-nFrames = 5
+tEnd = 4000e-6
+nFrames = 40
 
 -- physical constants
 -- eletron mass (kg)
@@ -49,7 +49,7 @@ tempSource = 150
 -- Magnetic field (Tesla)
 B0 = 2
 -- Recycling fraction
-recyclingFraction = 0
+recyclingFraction = 0.75
 -- Particle source proportionality factor
 A = 1.2
 
@@ -551,12 +551,6 @@ particleSourceElc = DataStruct.Field3D {
    numComponents = basisElc:numNodes(),
    ghost = {1, 1},
 }
--- particle source (IONS)
-particleSourceIon = DataStruct.Field3D {
-   onGrid = gridIon,
-   numComponents = basisIon:numNodes(),
-   ghost = {1, 1},
-}
 -- clear out contents
 particleSourceElc:clear(0.0)
 -- updater to fill out particle source
@@ -576,28 +570,15 @@ particleSourceUpdaterElc = Updater.ProjectOnNodalBasis3D {
 	 end
 }
 runUpdater(particleSourceUpdaterElc, 0.0, 0.0, {}, {particleSourceElc})
--- Calculate initial electron density field
-runUpdater(mom0CalcElc, 0.0, 0.0, {particleSourceElc}, {numDensityElc})
-numDensityElc:scale(2*math.pi*B0/elcMass)
--- Calculate initial ion density field
-runUpdater(initIonDensityCalc, 0.0, 0.0, {numDensityElc}, {numDensityIon})
-runUpdater(copyTo3DIonDg, 0.0, 0.0, {numDensityIon}, {numDensityIon3dDg})
--- updater to initialize distribution function of midplane ions
-initDistfMidplaneIon = Updater.ProjectOnNodalBasis3D {
-   onGrid = gridIon,
-   basis = basisIon,
-   -- are common nodes shared?
-   shareCommonNodes = false, -- In DG, common nodes are not shared
-   -- function to use for initialization
-   evaluate = function(z,vPara,mu,t)
-     return maxwellian(ionMass, math.sqrt(tPed*eV/ionMass), vPara, mu)
-	 end
-}
-runUpdater(initDistfMidplaneIon, 0.0, 0.0, {}, {distfIonUnit})
-runUpdater(multiply3dFields, 0.0, 0.0, {numDensityIon3dDg, distfIonUnit}, {particleSourceIon})
 
+-- particle source (IONS)
+particleSourceIon = DataStruct.Field3D {
+   onGrid = gridIon,
+   numComponents = basisIon:numNodes(),
+   ghost = {1, 1},
+}
 -- clear out contents
---particleSourceIon:clear(0.0)
+particleSourceIon:clear(0.0)
 -- updater to fill out particle source
 particleSourceUpdaterIon = Updater.ProjectOnNodalBasis3D {
    onGrid = gridIon,
@@ -614,7 +595,7 @@ particleSourceUpdaterIon = Updater.ProjectOnNodalBasis3D {
     end
 	 end
 }
---runUpdater(particleSourceUpdaterIon, 0.0, 0.0, {}, {particleSourceIon})
+runUpdater(particleSourceUpdaterIon, 0.0, 0.0, {}, {particleSourceIon})
 
 -- define electron equation to solve
 pbElcEqn = PoissonBracketEquation.SOL3D {
