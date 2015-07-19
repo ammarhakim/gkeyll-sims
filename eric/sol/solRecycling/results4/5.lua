@@ -13,8 +13,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 4000e-6
-nFrames = 40
+tEnd = 8000e-6
+nFrames = 80
 
 -- physical constants
 -- eletron mass (kg)
