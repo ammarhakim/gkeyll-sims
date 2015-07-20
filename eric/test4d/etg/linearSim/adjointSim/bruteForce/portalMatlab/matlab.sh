@@ -11,15 +11,6 @@
 #PBS -V 
 #PBS -j oe 
 cd $PBS_O_WORKDIR 
-matlab -nodisplay -nosplash <<EOF
-
-matlabpool open local 8
-
-portalProcessMatrices
-
-matlabpool close
-
-EOF
-
+matlab -nodisplay -nosplash < portalProcessMatrices.m > run.loog
 echo ""
 echo "Done at "`date`
