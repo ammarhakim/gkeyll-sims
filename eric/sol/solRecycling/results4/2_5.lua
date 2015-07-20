@@ -1263,16 +1263,16 @@ if Lucee.IsRestarting then
   startFrame = Lucee.RestartFrame + 1
   tCurr = tStart + tFrame*Lucee.RestartFrame
   print(tCurr)
+else
+  calcMoments(0.0, 0.0, distfElc, distfIon)
+  -- Scale initial ion distribution function so total number of ions = total number of electrons
+  distfIon:scale(integratedNumDensityElc:lastInsertedData()/integratedNumDensityIon:lastInsertedData())
 end
 
-calcMoments(0.0, 0.0, distfElc, distfIon)
--- Scale initial ion distribution function so total number of ions = total number of electrons
-distfIon:scale(integratedNumDensityElc:lastInsertedData()/integratedNumDensityIon:lastInsertedData())
 calcMoments(0.0, 0.0, distfElc, distfIon)
 -- apply boundary conditions to both fields
 runUpdater(momentsAtEdgesIonCalc, 0.0, 0.0, {distfIon}, {momentsAtEdgesIonRK1})
 applyBc(0.0, 0.0, distfElc, distfIon, momentsAtEdgesIonRK1, cutoffVelocities)
-
 -- calculate initial phi
 runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
 -- Copy the continuous phi back onto a dg field
