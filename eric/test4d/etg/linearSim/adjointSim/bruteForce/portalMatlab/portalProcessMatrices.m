@@ -1,7 +1,13 @@
 % Use to run tests on the cluster
 % load data2.mat
 function portalProcessMatrices
-  load('matlab_2.mat','F','V','D','B','gammaMax')
+  data = load('matlab_2.mat','F','V','D','B','gammaMax');
+  F = data.F;
+  V = data.V;
+  D = data.D;
+  B = data.B;
+  gammaMax = data.gammaMax;
+  clear data
   
   tPoints = linspace(0, 40e-6, 16);
   gPoints = zeros(1,length(tPoints));
