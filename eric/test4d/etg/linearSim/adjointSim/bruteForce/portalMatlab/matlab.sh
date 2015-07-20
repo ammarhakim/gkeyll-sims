@@ -1,16 +1,20 @@
-#!/bin/bash 
-
-#PBS -N mtest
-#-- mail on execution("b"), termination ("e"), or interruption ("a")
+#!/bin/bash
+#
+#PBS -l walltime=8:00:00,nodes=1:ppn=8,mem=16gb
+#PBS -j oe
+#
 #PBS -m ae
-#PBS -M eshi@pppl.gov 
-#PBS -l nodes=1:ppn=8 
-#PBS -l mem=1000mb
-#PBS -l walltime=1:00:00
-#PBS -r n
-#PBS -V 
-#PBS -j oe 
-cd $PBS_O_WORKDIR 
-matlab -nodisplay -nosplash < portalProcessMatrices.m > run.loog
+#PBS -M eshi@pppl.gov
+#
+
+cd $PBS_O_WORKDIR
+matlab -nosplash -nodisplay <<EOF
+matlabpool open local 8   
+% call the function
+portalProcessMatrices
+matlabpool close
+   
+EOF
+   
 echo ""
-echo "Done at "`date`
+echo "Done at " `date`
