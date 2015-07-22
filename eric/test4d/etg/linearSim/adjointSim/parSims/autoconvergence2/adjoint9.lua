@@ -29,7 +29,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-iterTol = 0.001 -- desired tolerance for convergence
+iterTol = 0.01 -- desired tolerance for convergence
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
