@@ -13,7 +13,7 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 5e-6
+tEnd = 50e-6
 nFrames = 5
 
 -- physical constants
