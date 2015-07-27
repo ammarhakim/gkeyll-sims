@@ -16,7 +16,7 @@ function serialProcessMatrices
     t = tPoints(i);
     [U_svd,S_svd,V_svd] = svdsecon(F*V*diag(exp(diag(D*t)))/B,1);
     gPoints(i) = S_svd(1,1)^2;
-    fprintf('G = %d, t = %d\n', gPoints2(i),tPoints2(i));
+    fprintf('G = %d, t = %d\n', gPoints(i),tPoints(i));
   end
   
   % Write to file
