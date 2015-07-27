@@ -12,6 +12,7 @@
 
 cd $PBS_O_WORKDIR
 matlab -nosplash -nodisplay <<EOF
+matlabpool close force local
 matlabpool open local 8   
 % call the function
 portalProcessMatrices
