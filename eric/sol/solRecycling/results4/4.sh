@@ -11,7 +11,7 @@
 #PBS -V 
 #PBS -j oe 
  
-CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i 4.lua -pc_type lu" 
+CMD="/p/gke/eshi/gkeyllall/ser-opt/gkeyll/gkeyllser -i 4.lua -pc_type lu -r 63" 
 cd $PBS_O_WORKDIR 
 $CMD 
 exit
