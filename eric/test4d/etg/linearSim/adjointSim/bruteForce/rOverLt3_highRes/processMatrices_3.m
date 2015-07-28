@@ -26,5 +26,5 @@ function processMatrices_3
   B = F*V;
   
   % Save workspace
-  save('matlab_3.mat')
+  save('matlab_3.mat','-v7.3')
 end
