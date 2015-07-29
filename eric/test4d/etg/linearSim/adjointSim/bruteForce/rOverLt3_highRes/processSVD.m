@@ -1,30 +1,24 @@
 function processMatrices_3
-  load innerProductMatrix3.mtx
+  data = load('matlab_3.mat','F','V','D','B');
+  F = data.F;
+  V = data.V;
+  D = data.D;
+  B = data.B;
+  clear data
+
+  gammaMax = max(real(diag(D)));
+  tPoints = linspace(0, 40e-6, 10);
+  gPoints = zeros(1,length(tPoints));
+
+  parfor i = 1:length(tPoints)
+    t = tPoints(i);
+     [U_svd,S_svd,V_svd] = svdsecon(F*V*diag(exp(diag(D*t)))/B,1);
+     gPoints(i) = S_svd(1,1)^2;
+    fprintf('G = %d, t = %d\n', gPoints(i),tPoints(i));
+  end
   
-  % Set value at third column, first row to 0.0, which is usually the number
-  % of nonzero entries in the sparse matrix but matlab will interpret it as
-  % an entry if not set to zero
-  innerProductMatrix3(1,3) = 0.0;
-  sparseM = spconvert(innerProductMatrix3);
-  spy(sparseM)
-  L = chol(sparseM,'lower'); % Returns lower triangular matrix satisfying
-  % L*L' = sparseM
-  F = L.';
-  
-  clear innerProductMatrix3
-  clear L
-  clear sparseM
-  
-  load linearOperatorMatrix3.mtx
-  linearOperatorMatrix3(1,3) = 0.0;
-  sparseLO = spconvert(linearOperatorMatrix3);
-  clear linearOperatorMatrix3
-  % spy(sparseLO)
-  [V,D] = eig(full(sparseLO));
-  clear sparseLO
-  
-  B = F*V;
-  
-  % Save workspace
-  save('matlab_3.mat','-v7.3')
+  % Write to file
+  plotData(:,1) = tPoints';
+  plotData(:,2) = gPoints';
+  save('data3.mat','plotData','gammaMax')
 end

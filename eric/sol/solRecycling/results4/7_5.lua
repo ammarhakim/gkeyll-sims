@@ -1269,21 +1269,21 @@ else
   distfIon:scale(integratedNumDensityElc:lastInsertedData()/integratedNumDensityIon:lastInsertedData())
 end
 
-calcMoments(0.0, 0.0, distfElc, distfIon)
+calcMoments(tCurr, 0.0, distfElc, distfIon)
 -- apply boundary conditions to both fields
-runUpdater(momentsAtEdgesIonCalc, 0.0, 0.0, {distfIon}, {momentsAtEdgesIonRK1})
-applyBc(0.0, 0.0, distfElc, distfIon, momentsAtEdgesIonRK1, cutoffVelocities)
+runUpdater(momentsAtEdgesIonCalc, tCurr, 0.0, {distfIon}, {momentsAtEdgesIonRK1})
+applyBc(tCurr, 0.0, distfElc, distfIon, momentsAtEdgesIonRK1, cutoffVelocities)
 -- calculate initial phi
-runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
+runUpdater(electrostaticPhiCalc, tCurr, 0.0, {numDensityElc, numDensityIon}, {phi1d})
 -- Copy the continuous phi back onto a dg field
 runUpdater(copyCToD1d, 0.0, 0.0, {phi1d}, {phi1dDg})
 -- calculate initial Hamiltonian
 calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
 calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
 -- compute initial diagnostics
-calcDiagnostics(0.0, 0.0)
+calcDiagnostics(tCurr, 0.0)
 -- write out initial conditions
-writeFields(0, 0.0)
+writeFields(startFrame-1, tCurr)
 -- make a duplicate in case we need it
 distfDupElc = distfElc:duplicate()
 distfDupIon = distfIon:duplicate()
