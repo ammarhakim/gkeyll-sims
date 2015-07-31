@@ -765,7 +765,7 @@ function rk3adjoint(tCurr, myDt)
   phi2dSmoothed:sync()
   -- calculate adjoint potential
   calcAdjointPotential(tCurr, myDt, f1, adjointPotential)
-  runUpdater(copy2dTo4d, myDt, myDt, {adjointPotential}, {adjointPotential4d})
+  runUpdater(copy2dTo4d, tCurr, myDt, {adjointPotential}, {adjointPotential4d})
   runUpdater(copy2dTo4d, tCurr, myDt, {phi2dSmoothed}, {phi4dSmoothed})
   adjointPotential4d:sync()
   phi4dSmoothed:sync()
@@ -976,8 +976,8 @@ function adjointSingleIteration(currIter, tEndIter)
   Lucee.logInfo (string.format("--Iteration %g: Advancing solution from %g to %g", currIter, tStart, tEndIter))
   dtSuggested = advanceFrame(tStart, tEndIter, dtSuggested)
   Lucee.logInfo ("")
-  W_T_PREV = W_T
-  W_T = freeEnergy:lastInsertedData()
+  W_T_PREV = W_T -- set by previous iteration
+  W_T = freeEnergy:lastInsertedData() -- set in current iteration's advanceFrame
   
   -- recompute initial potential and hamiltonian with scaled f
   calcPotential(phi2d, f)
