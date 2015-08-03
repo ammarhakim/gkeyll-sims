@@ -1282,9 +1282,9 @@ runUpdater(copyCToD1d, 0.0, 0.0, {phi1d}, {phi1dDg})
 calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
 calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
 -- compute initial diagnostics
-calcDiagnostics(0.0, 0.0)
+calcDiagnostics(tCurr, 0.0)
 -- write out initial conditions
-writeFields(0, 0.0)
+writeFields(startFrame-1, tCurr)
 -- make a duplicate in case we need it
 distfDupElc = distfElc:duplicate()
 distfDupIon = distfIon:duplicate()
