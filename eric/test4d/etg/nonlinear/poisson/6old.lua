@@ -20,7 +20,7 @@ cfl = 0.05
 tStart = 0.0
 tEnd = 20e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 20
+nFrames = 5
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -58,6 +58,10 @@ VPARA_LOWER = -math.sqrt(N_VPARA)*vtKinetic
 VPARA_UPPER = math.sqrt(N_VPARA)*vtKinetic
 MU_LOWER = 0
 MU_UPPER = math.sqrt(N_MU/2)*2*kineticMass*vtKinetic*vtKinetic/B0
+--VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
+--VPARA_LOWER = -VPARA_UPPER
+--MU_LOWER = 0
+--MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -319,6 +323,11 @@ phi2d = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
+phi2dSmoothed = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 -- to store electrostatic potential for addition to hamiltonian
 phi4d = DataStruct.Field4D {
   onGrid = grid_4d,
@@ -335,21 +344,11 @@ phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   adiabaticCharge = adiabaticCharge,
 }
 
--- create updater to solve Poisson equation
-poissonSlvr = Updater.FemPoisson2D {
+-- Updater to smooth out 2d field (phi)
+smoothCalc = Updater.SimpleSmoothToC02D {
    onGrid = grid_2d,
    basis = basis_2d,
-   periodicDirs = {0, 1},
-   sourceNodesShared = false, -- default true
-   solutionNodesShared = false, -- default true
-   writeStiffnessMatrix = false,
-   modifierConstant = -kineticTemp/(adiabaticTemp*rho_s^2)
-}
--- Stores right-hand side of poisson equation
-poissonSource = DataStruct.Field2D {
-   onGrid = grid_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
+   polyOrder = polyOrder,
 }
 
 multiply4dCalc = Updater.FieldArithmeticUpdater4D {
@@ -410,15 +409,8 @@ function calcNumDensity(fIn, nOut)
   --nOut:sync()
 end
 
-function calcPotential(nKineticIn, nAdiabaticIn, phiOut)
-  poissonSource:copy(nAdiabaticIn)
-  poissonSource:accumulate(-1.0, nKineticIn)
-  poissonSource:scale(-kineticTemp/(n0*rho_s^2)) -- kineticTemp is in eV
-  runUpdater(poissonSlvr, 0.0, 0.0, {poissonSource}, {phiOut})
-end
-
 function calcDiagnostics(curr, dt)
-  runUpdater(fieldEnergyCalc, curr, dt, {phi2d}, {fieldEnergy})
+  runUpdater(fieldEnergyCalc, curr, dt, {phi2dSmoothed}, {fieldEnergy})
   -- Calc perturbed density
   numDensityDelta:copy(numDensityKinetic)
   numDensityDelta:accumulate(-1.0, numDensityAdiabatic)
@@ -437,10 +429,14 @@ function rk3(tCurr, myDt)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
   -- compute potential
-  calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
+  runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi2d})
+  -- Apply boundary conditions
   phi2d:sync()
+  -- smooth potential
+  runUpdater(smoothCalc, tCurr, myDt, {phi2d}, {phi2dSmoothed})
+  phi2dSmoothed:sync()
   -- Compute hamiltonian
-  calcHamiltonian(hamilKE, phi2d, hamil)
+  calcHamiltonian(hamilKE, phi2dSmoothed, hamil)
 
   -- RK stage 2
   local myStatus, myDtSuggested = runUpdater(pbSlvr, tCurr, myDt, {f1, hamil}, {fNew})
@@ -454,10 +450,14 @@ function rk3(tCurr, myDt)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
   -- compute potential
-  calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
+  runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi2d})
+  -- Apply boundary conditions
   phi2d:sync()
+  -- smooth potential
+  runUpdater(smoothCalc, tCurr, myDt, {phi2d}, {phi2dSmoothed})
+  phi2dSmoothed:sync()
   -- Compute hamiltonian
-  calcHamiltonian(hamilKE, phi2d, hamil)
+  calcHamiltonian(hamilKE, phi2dSmoothed, hamil)
 
   -- RK stage 3
   local myStatus, myDtSuggested = runUpdater(pbSlvr, tCurr, myDt, {f1, hamil}, {fNew})
@@ -471,10 +471,14 @@ function rk3(tCurr, myDt)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
   -- compute potential
-  calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
+  runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi2d})
+  -- Apply boundary conditions
   phi2d:sync()
+  -- smooth potential
+  runUpdater(smoothCalc, tCurr, myDt, {phi2d}, {phi2dSmoothed})
+  phi2dSmoothed:sync()
   -- Compute hamiltonian
-  calcHamiltonian(hamilKE, phi2d, hamil)
+  calcHamiltonian(hamilKE, phi2dSmoothed, hamil)
 
   f:copy(f1)
 
@@ -527,7 +531,7 @@ end
 function writeFields(frameNum, tCurr)
    --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
-   phi2d:write( string.format("phi_%d.h5", frameNum), tCurr)
+   phi2dSmoothed:write( string.format("phi_%d.h5", frameNum), tCurr)
    numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
@@ -551,9 +555,11 @@ f:copy(fNew)
 applyBcToTotalDistF(f)
 -- Compute potential with perturbation added
 calcNumDensity(f, numDensityKinetic)
-calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
+runUpdater(phiCalc, 0.0, 0.0, {numDensityKinetic, numDensityAdiabatic}, {phi2d})
 phi2d:sync()
-calcHamiltonian(hamilKE, phi2d, hamil)
+runUpdater(smoothCalc, 0.0, 0.0, {phi2d}, {phi2dSmoothed})
+phi2dSmoothed:sync()
+calcHamiltonian(hamilKE, phi2dSmoothed, hamil)
 
 -- Compute diagnostics for t = 0
 calcDiagnostics(0.0, 0.0)
