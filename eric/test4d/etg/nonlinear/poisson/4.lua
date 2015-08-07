@@ -54,10 +54,10 @@ X_LOWER = R
 X_UPPER = R + deltaR
 Y_LOWER = -deltaR/2
 Y_UPPER = deltaR/2
-VPARA_LOWER = -math.sqrt(N_VPARA)*vtKinetic
-VPARA_UPPER = math.sqrt(N_VPARA)*vtKinetic
+VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
+VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.sqrt(N_MU/2)*2*kineticMass*vtKinetic*vtKinetic/B0
+MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(B0)
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
