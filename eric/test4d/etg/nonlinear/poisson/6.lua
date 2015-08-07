@@ -4,7 +4,7 @@
 -- Another attempt at the /noKzfScan1 simulation.
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 1, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -18,9 +18,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 5e-6
+tEnd = 20e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 5
+nFrames = 20
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -42,12 +42,12 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/4
+L_T       = R/6
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 8
 N_Y = 8
-N_VPARA = 16
+N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
