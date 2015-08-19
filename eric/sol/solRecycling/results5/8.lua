@@ -644,6 +644,12 @@ function getIonAlpha(t)
   local avgIonDensity = integratedNumDensityIon:lastInsertedData()/totalLength -- [1/m^3]
   -- see http://farside.ph.utexas.edu/teaching/plasma/Plasmahtml/node35.html
   local logLambda = 6.6-0.5*math.log(avgIonDensity/10^(20)) + 1.5*math.log(avgElcTemp/eV)
+
+  -- ratio of transit period to collision period
+  local collisionPeriod = 1/(logLambda*eV^4*avgIonDensity/(12*math.pi^(3/2)*eps0^2*math.sqrt(ionMass)*(avgIonTemp)^(3/2)))
+  local transitPeriod = (totalLength/2)/math.sqrt(integratedVThermSqIon:lastInsertedData()/totalLength)
+  print( string.format('collision frequency ratio = %e\n',transitPeriod/collisionPeriod) )
+
   return logLambda*eV^4*avgIonDensity/(12*math.pi^(3/2)*eps0^2*math.sqrt(ionMass)*(avgIonTemp)^(3/2))
 end
 
@@ -1290,6 +1296,8 @@ distfDupElc = distfElc:duplicate()
 distfDupIon = distfIon:duplicate()
 hamilDupElc = hamilElc:duplicate()
 hamilDupIon = hamilIon:duplicate()
+
+getIonAlpha(0.0)
 
 for frame = startFrame, nFrames do
    Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))

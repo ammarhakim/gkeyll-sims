@@ -217,6 +217,16 @@ tIon = DataStruct.Field1D {
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
 }
+tParaIon = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+tPerpIon = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- Updater to compute electron number density
 mom0CalcElc = Updater.DistFuncMomentCalc1DFrom3D {
@@ -643,6 +653,12 @@ function getIonAlpha(t)
   local avgIonDensity = integratedNumDensityIon:lastInsertedData()/totalLength -- [1/m^3]
   -- see http://farside.ph.utexas.edu/teaching/plasma/Plasmahtml/node35.html
   local logLambda = 6.6-0.5*math.log(avgIonDensity/10^(20)) + 1.5*math.log(avgElcTemp/eV)
+
+  -- ratio of transit period to collision period
+  local collisionPeriod = 1/(logLambda*eV^4*avgIonDensity/(12*math.pi^(3/2)*eps0^2*math.sqrt(ionMass)*(avgIonTemp)^(3/2)))
+  local transitPeriod = (totalLength/2)/math.sqrt(integratedVThermSqIon:lastInsertedData()/totalLength)
+  print( string.format('collision frequency ratio = %e\n',transitPeriod/collisionPeriod) )
+
   return logLambda*eV^4*avgIonDensity/(12*math.pi^(3/2)*eps0^2*math.sqrt(ionMass)*(avgIonTemp)^(3/2))
 end
 
@@ -726,7 +742,6 @@ function calcMoments(curr, dt, distfElcIn, distfIonIn)
     {driftUElc, vThermSqElc})
   runUpdater(vFromMomentsCalcIon, curr, dt, {numDensityIon, mom1ParaIon, mom1MuIon, mom2ParaIon},
     {driftUIon, vThermSqIon})
-
   --driftUElc:clear(0.0)
   --driftUIon:clear(0.0)
   -- copy vThermSq fields to 3d
@@ -738,6 +753,18 @@ function calcMoments(curr, dt, distfElcIn, distfIonIn)
   -- integrate numDensity over space
   runUpdater(integrateSpatialField, curr, dt, {numDensityElc}, {integratedNumDensityElc})
   runUpdater(integrateSpatialField, curr, dt, {numDensityIon}, {integratedNumDensityIon})
+
+  -- compute only parallel temperature
+  mom1MuIon:clear(0.0)
+  runUpdater(vFromMomentsCalcIon, curr, dt, {numDensityIon, mom1ParaIon, mom1MuIon, mom2ParaIon},
+    {driftUIonTemp, vThermSqParaIon})
+  -- compute only perpendicular temperature
+  mom1ParaIon:clear(0.0)
+  mom2ParaIon:clear(0.0)
+  runUpdater(mom1MuCalcIon, curr, dt, {distfIonIn}, {mom1MuIon})
+  mom1MuIon:scale(2*math.pi*B0/ionMass*2*B0/ionMass)
+  runUpdater(vFromMomentsCalcIon, curr, dt, {numDensityIon, mom1ParaIon, mom1MuIon, mom2ParaIon},
+    {driftUIonTemp, vThermSqPerpIon})
 end
 
 -- field to store continuous potential in 1D
@@ -819,6 +846,11 @@ driftUIon = DataStruct.Field1D {
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
 }
+driftUIonTemp = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
 
 -- vt^2 for both species
 vThermSqElc = DataStruct.Field1D {
@@ -827,6 +859,16 @@ vThermSqElc = DataStruct.Field1D {
    ghost = {1, 1},
 }
 vThermSqIon = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+vThermSqParaIon = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+vThermSqPerpIon = DataStruct.Field1D {
    onGrid = grid_1d,
    numComponents = basis_1d:numNodes(),
    ghost = {1, 1},
@@ -1004,6 +1046,12 @@ function calcDiagnostics(curr, dt)
   tElc:scale(elcMass/eV)
   tIon:copy(vThermSqIon)
   tIon:scale(ionMass/eV)
+
+  tParaIon:copy(vThermSqParaIon)
+  tParaIon:scale(3*ionMass/eV)
+
+  tPerpIon:copy(vThermSqPerpIon)
+  tPerpIon:scale(3*ionMass/eV/2)
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -1231,6 +1279,8 @@ function writeFields(frameNum, tCurr)
    numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
    tElc:write( string.format("tElc_%d.h5", frameNum), tCurr)
    tIon:write( string.format("tIon_%d.h5", frameNum), tCurr)
+   tParaIon:write( string.format("tParaIon_%d.h5", frameNum), tCurr)
+   tPerpIon:write( string.format("tPerpIon_%d.h5", frameNum), tCurr)
    distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
    distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    mom1ParaElc:write( string.format("mom1ParaElc_%d.h5", frameNum), tCurr)
@@ -1281,14 +1331,16 @@ runUpdater(copyCToD1d, 0.0, 0.0, {phi1d}, {phi1dDg})
 calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
 calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
 -- compute initial diagnostics
-calcDiagnostics(0.0, 0.0)
+calcDiagnostics(tCurr, 0.0)
 -- write out initial conditions
-writeFields(0, 0.0)
+writeFields(startFrame-1, tCurr)
 -- make a duplicate in case we need it
 distfDupElc = distfElc:duplicate()
 distfDupIon = distfIon:duplicate()
 hamilDupElc = hamilElc:duplicate()
 hamilDupIon = hamilIon:duplicate()
+
+getIonAlpha(0.0)
 
 for frame = startFrame, nFrames do
    Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
