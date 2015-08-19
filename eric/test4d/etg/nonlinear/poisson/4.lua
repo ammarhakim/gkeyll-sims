@@ -4,7 +4,7 @@
 -- Another attempt at the /noKzfScan1 simulation.
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -18,9 +18,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 5e-6
+tEnd = 20e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 5
+nFrames = 1000
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -45,8 +45,8 @@ deltaR    = 32*rho_s
 L_T       = R/4
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 8
-N_Y = 8
+N_X = 16
+N_Y = 16
 N_VPARA = 16
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
@@ -145,11 +145,11 @@ end
 
 function perturbDensityProfile(x,y)
   --linear
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
   --nonlinear
-  --local x0 = (X_LOWER+X_UPPER)/2
-  --local sigma = deltaR/4
-  --return (vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
+  local x0 = (X_LOWER+X_UPPER)/2
+  local sigma = deltaR/4
+  return (vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
 end
 
 function fProfile(x,y,v,mu)
