@@ -425,53 +425,6 @@ function calcDiagnostics(curr, dt)
   numDensityDelta:accumulate(-1.0, numDensityAdiabatic)
 end
 
--- to compute mu moment
-muCalc = Updater.DistFuncMomentCalcWeighted2D {
-   -- 4D phase-space grid 
-   onGrid = grid_4d,
-   -- 4D phase-space basis functions
-   basis4d = basis_4d,
-   -- 2D spatial basis functions
-   basis2d = basis_2d,
-   -- desired moment (0, 1 or 2)
-   moment = 1,
-   -- direction to calculate moment
-   momentDirection = 3,
-}
-muMoment = numDensityKinetic:duplicate()
-muMomentTimesB = numDensityKinetic:duplicate()
-
--- to compute vParaSq moment
-vParaSqCalc = Updater.DistFuncMomentCalcWeighted2D {
-   -- 4D phase-space grid 
-   onGrid = grid_4d,
-   -- 4D phase-space basis functions
-   basis4d = basis_4d,
-   -- 2D spatial basis functions
-   basis2d = basis_2d,
-   -- desired moment (0, 1 or 2)
-   moment = 2,
-   -- direction to calculate moment
-   momentDirection = 2,
-}
-vParaSq = numDensityKinetic:duplicate()
-backgroundKineticTemp = numDensityKinetic:duplicate()
-
--- Return temperature of a background distribution function (in eV?)
-function calcBackgroundTemperature(fIn, curr, dt, outputField)
-  runUpdater(muCalc, curr, dt, {fIn, bField2d}, {muMoment})
-  muMoment:scale(2*math.pi/kineticMass)
-  runUpdater(multiply2dCalc, curr, dt, {bField2d, muMoment}, {muMomentTimesB})
-
-  runUpdater(vParaSqCalc, curr, dt, {fIn, bField2d}, {vParaSq})
-  vParaSq:scale(2*math.pi/kineticMass)
-
-  outputField:clear(0.0)
-  outputField:accumulate(kineticMass/(3*n0), vParaSq)
-  outputField:accumulate(2/(3*n0), muMomentTimesB)
-  outputField:scale(1/eV)
-end
-
 -- function to take a time-step using SSP-RK3 time-stepping scheme
 function rk3(tCurr, myDt)
   -- RK stage 1
@@ -577,6 +530,7 @@ function writeFields(frameNum, tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2d:write( string.format("phi_%d.h5", frameNum), tCurr)
    numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
+   --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
@@ -589,9 +543,6 @@ calcNumDensity(f, numDensityKinetic)
 numDensityAdiabatic:copy(numDensityKinetic)
 -- Store background f
 fBackground:copy(f)
--- Compute background f's temperature
-calcBackgroundTemperature(fBackground, 0.0, 0.0, backgroundKineticTemp)
-backgroundKineticTemp:write( string.format("bgTemp_%d.h5", 0), 0.0)
 
 -- Add perturbation to f
 runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
