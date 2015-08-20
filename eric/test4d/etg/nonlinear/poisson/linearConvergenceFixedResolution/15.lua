@@ -4,6 +4,9 @@
 -- Another attempt at the /noKzfScan1 simulation.
 -- 8-18-2015: testing poisson solver
 -- 8-19-2015: Using vPara cells and varying R/L_T
+-- R/L_T = 14.531244
+-- Average kinetic T = 2085.126177
+-- omega_r, gamma = 4.102000  4.104000
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
