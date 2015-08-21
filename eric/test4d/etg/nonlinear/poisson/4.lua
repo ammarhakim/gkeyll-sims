@@ -22,6 +22,7 @@ tEnd = 20e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 1000
 tFrame = (tEnd-tStart)/nFrames -- time between frames
+tCurr = tStart
 
 -- physical parameters
 eV            = Lucee.ElementaryCharge
@@ -525,11 +526,10 @@ end
 
 -- write data to H5 file
 function writeFields(frameNum, tCurr)
-   --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
    phi2d:write( string.format("phi_%d.h5", frameNum), tCurr)
    numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
-   --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
+   f:write( string.format("f_%d.h5", frameNum), tCurr)
 end
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
@@ -543,12 +543,23 @@ numDensityAdiabatic:copy(numDensityKinetic)
 -- Store background f
 fBackground:copy(f)
 
--- Add perturbation to f
-runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
---fNew:sync()
-f:copy(fNew)
--- Apply boundary conditions
-applyBcToTotalDistF(f)
+startFrame = 1
+
+if Lucee.IsRestarting then
+  f:read("f_" .. Lucee.RestartFrame .. ".h5")
+  f:sync()
+
+  startFrame = Lucee.RestartFrame + 1
+  tCurr = tStart + tFrame*Lucee.RestartFrame
+else
+  -- Add perturbation to f
+  runUpdater(multiply4dCalc, 0.0, 0.0, {f, fInitialPerturb}, {fNew})
+  --fNew:sync()
+  f:copy(fNew)
+  -- Apply boundary conditions
+  applyBcToTotalDistF(f)
+end
+
 -- Compute potential with perturbation added
 calcNumDensity(f, numDensityKinetic)
 calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
@@ -556,12 +567,10 @@ phi2d:sync()
 calcHamiltonian(hamilKE, phi2d, hamil)
 
 -- Compute diagnostics for t = 0
-calcDiagnostics(0.0, 0.0)
-writeFields(0,0)
+calcDiagnostics(tCurr, 0.0)
+writeFields(startFrame-1,tCurr)
 
-tCurr = tStart
-
-for frame = 1, nFrames do
+for frame = startFrame, nFrames do
   Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
   dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
   tCurr = tCurr+tFrame
