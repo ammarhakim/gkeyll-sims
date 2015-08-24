@@ -146,11 +146,11 @@ end
 
 function perturbDensityProfile(x,y)
   --linear
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
   --nonlinear
-  --local x0 = (X_LOWER+X_UPPER)/2
-  --local sigma = deltaR/4
-  --return (vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
+  local x0 = (X_LOWER+X_UPPER)/2
+  local sigma = deltaR/4
+  return (vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
 end
 
 function fProfile(x,y,v,mu)
