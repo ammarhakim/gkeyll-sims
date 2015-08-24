@@ -48,7 +48,7 @@ ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 16
 N_Y = 16
-N_VPARA = 16
+N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
@@ -150,7 +150,7 @@ function perturbDensityProfile(x,y)
   --nonlinear
   local x0 = (X_LOWER+X_UPPER)/2
   local sigma = deltaR/4
-  return (vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
+  return 1e-2*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
 end
 
 function fProfile(x,y,v,mu)
