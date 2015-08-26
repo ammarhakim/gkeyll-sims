@@ -18,9 +18,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 40e-6
+tEnd = 20e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 2000
+nFrames = 1000
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 tCurr = tStart
 
