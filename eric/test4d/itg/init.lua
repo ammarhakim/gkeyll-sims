@@ -10,6 +10,11 @@ confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
    collectDirections = {0, 1},
 }
+-- 1d configuration space decomp (x-only)
+confDecomp1d = DecompRegionCalc1D.SubCartProd2D {
+   decomposition = confDecomp,
+   collectDirections = {0},
+}
 
 -- polynomial order
 polyOrder = 1
@@ -28,6 +33,7 @@ tCurr = tStart
 eV            = Lucee.ElementaryCharge
 kineticCharge = -Lucee.ElementaryCharge
 adiabaticCharge = Lucee.ElementaryCharge
+ionMass = 2.014*Lucee.ProtonMass
 kineticMass   = Lucee.ElectronMass
 adiabaticMass = 2.014*Lucee.ProtonMass -- (deuterium ions)
 kineticTemp   = 2072 -- [eV]
@@ -100,6 +106,12 @@ grid_back_2d = Grid.RectCart2D {
    cells = {N_X, N_Y},
    decomposition = confDecomp,
 }
+grid_1d = Grid.RectCart1D {
+   lower = {X_LOWER},
+   upper = {X_UPPER},
+   cells = {N_X},
+   decomposition = confDecomp1d,
+}
 -- create 4d basis functions
 basis_4d = NodalFiniteElement4D.SerendipityElement {
    onGrid = grid_4d,
@@ -110,7 +122,11 @@ basis_2d = NodalFiniteElement2D.SerendipityElement {
    onGrid = grid_2d,
    polyOrder = polyOrder,
 }
-
+-- create 1d basis functions
+basis_1d = NodalFiniteElement1D.SerendipityElement {
+   onGrid = grid_1d,
+   polyOrder = polyOrder,
+}
 -- distribution function for electrons
 f = DataStruct.Field4D {
    onGrid = grid_back_4d,
@@ -327,15 +343,6 @@ phi4d = DataStruct.Field4D {
   ghost = {1, 1},
 }
 
--- Updater to compute potential
-phiCalc = Updater.ETGAdiabaticPotentialUpdater {
-  onGrid = grid_2d,
-  basis = basis_2d,
-  n0 = n0,
-  adiabaticTemp = adiabaticTemp,
-  adiabaticCharge = adiabaticCharge,
-}
-
 -- create updater to solve Poisson equation
 poissonSlvr = Updater.FemPoisson2D {
    onGrid = grid_2d,
@@ -359,6 +366,49 @@ multiply4dCalc = Updater.FieldArithmeticUpdater4D {
   evaluate = function(fld1, fld2)
     return fld1*fld2
   end
+}
+
+-- create updater to solve Poisson equation for flux-surface averaged potential
+fluxSurfaceAveragePotentialSlvr = Updater.FemPoisson2D {
+   onGrid = grid_2d,
+   basis = basis_2d,
+   periodicDirs = {0, 1},
+   sourceNodesShared = false, -- default true
+   solutionNodesShared = false, -- default true
+   writeStiffnessMatrix = false,
+}
+
+-- updater to compute flux surface (y) average of potential
+fluxSurfaceAverageCalc = Updater.DistFuncMomentCalc1D {
+  onGrid = grid_2d,
+  basis1d = basis_1d,
+  basis2d = basis_2d,
+  moment = 0,
+}
+
+-- updater to copy flux surace (y) averaged potential back to a 2d field
+copy1DTo2D = Updater.CopyNodalFields1D_2D {
+   onGrid = grid_2d,
+   sourceBasis = basis_1d,
+   targetBasis = basis_2d
+}
+
+sourceFluxSurfaceAveraged1d = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+
+sourceFluxSurfaceAveraged2d = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+
+phiFluxSurfaceAveraged2d = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
 }
 
 function applyBcToTotalDistF(fld)
@@ -415,6 +465,17 @@ function calcPotential(nKineticIn, nAdiabaticIn, phiOut)
   poissonSource:copy(nAdiabaticIn)
   poissonSource:accumulate(-1.0, nKineticIn)
   poissonSource:scale(-kineticTemp/(n0*rho_s^2)) -- kineticTemp is in eV
+
+  -- compute flux-surface average of poissonSource
+  runUpdater(fluxSurfaceAverageCalc, 0.0, 0.0, {poissonSource}, {sourceFluxSurfaceAveraged1d})
+  sourceFluxSurfaceAveraged1d:scale(1/(Y_UPPER-Y_LOWER))
+  -- copy 1d result back to a 2d field for use in poisson solve
+  runUpdater(copy1DTo2D, 0.0, 0.0, {sourceFluxSurfaceAveraged1d}, {sourceFluxSurfaceAveraged2d})
+  -- solve for flux-surface averaged potential
+  runUpdater(fluxSurfaceAveragePotentialSlvr, 0.0, 0.0, {sourceFluxSurfaceAveraged2d}, {phiFluxSurfaceAveraged2d})
+  -- accumulate flux-surface averaged potential to poissonSource to solve for phi
+  poissonSource:accumulate(-1/(rho_s^2), phiFluxSurfaceAveraged2d)
+
   runUpdater(poissonSlvr, 0.0, 0.0, {poissonSource}, {phiOut})
 end
 
@@ -526,10 +587,10 @@ end
 
 -- write data to H5 file
 function writeFields(frameNum, tCurr)
-   fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
-   phi2d:write( string.format("phi_%d.h5", frameNum), tCurr)
-   numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
-   f:write( string.format("f_%d.h5", frameNum), tCurr)
+  fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
+  phi2d:write( string.format("phi_%d.h5", frameNum), tCurr)
+  numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
+  f:write( string.format("f_%d.h5", frameNum), tCurr)
 end
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
