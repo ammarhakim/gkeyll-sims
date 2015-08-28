@@ -23,7 +23,7 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 20e-6
+tEnd = 10e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 1000
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -165,7 +165,7 @@ function perturbDensityProfile(x,y)
   --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
   --nonlinear
   local x0 = (X_LOWER+X_UPPER)/2
-  local sigma = deltaR/4
+  local sigma = (X_UPPER-X_LOWER)/4
   return 1e-2*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
 end
 
