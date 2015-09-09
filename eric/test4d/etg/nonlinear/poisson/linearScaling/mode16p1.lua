@@ -486,6 +486,9 @@ function scalePertrubation(curr, dt, distf, targetEnergy)
   -- Add back to total field with new scale factor
   distf:accumulate(math.sqrt(targetEnergy/fieldEnergy:lastInsertedData()), fFluctuating)
   distf:sync()
+
+  phi2d:scale(math.sqrt(targetEnergy/fieldEnergy:lastInsertedData()))
+  phi2d:sync()
   -- recalculate potential (commented out with phi2d filtering)
   -- compute number density
   --calcNumDensity(distf, numDensityKinetic)
