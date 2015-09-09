@@ -51,7 +51,7 @@ ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
 N_Y = 8
-N_VPARA = 4
+N_VPARA = 12
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
@@ -382,6 +382,7 @@ end
 
 -- dynvector for field energy
 fieldEnergy = DataStruct.DynVector { numComponents = 1, }
+fieldEnergyRaw = DataStruct.DynVector { numComponents = 1, }
 -- to compute field energy
 fieldEnergyCalc = Updater.IntegrateGeneralField2D {
    onGrid = grid_2d,
@@ -489,6 +490,8 @@ function scalePertrubation(curr, dt, distf, targetEnergy)
 
   phi2d:scale(math.sqrt(targetEnergy/fieldEnergy:lastInsertedData()))
   phi2d:sync()
+  -- following data should be constant
+  runUpdater(fieldEnergyCalc, curr, dt, {phi2d}, {fieldEnergyRaw})
   -- recalculate potential (commented out with phi2d filtering)
   -- compute number density
   --calcNumDensity(distf, numDensityKinetic)
@@ -625,6 +628,7 @@ end
 function writeFields(frameNum, tCurr)
    --numDensityKinetic:write( string.format("n_%d.h5", frameNum), tCurr)
    fieldEnergy:write( string.format("fieldEnergy_%d.h5", frameNum), tCurr)
+   fieldEnergyRaw:write( string.format("fieldEnergyRaw_%d.h5", frameNum), tCurr)
    phi2d:write( string.format("phi_%d.h5", frameNum), tCurr)
    --phi2d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
 end
@@ -654,6 +658,7 @@ calcHamiltonian(hamilKE, phi2d, hamil)
 
 -- Compute diagnostics for t = 0
 calcDiagnostics(0.0, 0.0)
+runUpdater(fieldEnergyCalc, 0, 0, {phi2d}, {fieldEnergyRaw})
 -- Store result of initial field energy
 initialFieldEnergy = fieldEnergy:lastInsertedData()
 writeFields(0,0)

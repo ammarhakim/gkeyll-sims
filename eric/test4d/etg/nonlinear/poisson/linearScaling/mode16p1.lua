@@ -149,7 +149,7 @@ end
 
 function perturbDensityProfile(x,y)
   --linear
-  return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
+  return 1e-6*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
   --nonlinear
   --local x0 = (X_LOWER+X_UPPER)/2
   --local sigma = deltaR/4
@@ -420,7 +420,7 @@ initCosineField = Updater.EvalOnNodes2D {
   basis = basis_2d,
   shareCommonNodes = false,
   evaluate = function (x,y,t)
-    return math.cos(ky_min*y)/math.sqrt(2)
+    return math.cos(ky_min*y)*math.sqrt(2)
   end
 }
 runUpdater(initCosineField, 0.0, 0.0, {}, {cosineField})
@@ -431,7 +431,7 @@ initSineField = Updater.EvalOnNodes2D {
   basis = basis_2d,
   shareCommonNodes = false,
   evaluate = function (x,y,t)
-    return math.sin(ky_min*y)/math.sqrt(2)
+    return math.sin(ky_min*y)*math.sqrt(2)
   end
 }
 runUpdater(initSineField, 0.0, 0.0, {}, {sineField})
@@ -466,13 +466,13 @@ end
 
 function calcDiagnostics(curr, dt)
   -- compute projection of potential on the sine and cosine fields
-  runUpdater(modeProjectionCalc, curr, dt, {phi2d, cosineField}, {cosineWeights})
-  runUpdater(modeProjectionCalc, curr, dt, {phi2d, sineField}, {sineWeights})
+  --runUpdater(modeProjectionCalc, curr, dt, {phi2d, cosineField}, {cosineWeights})
+  --runUpdater(modeProjectionCalc, curr, dt, {phi2d, sineField}, {sineWeights})
   -- construct the smoothed potential from cosineField and sineField
-  phi2d:clear(0.0)
-  phi2d:accumulate(cosineWeights:lastInsertedData()/cosineNormWeights:lastInsertedData(), cosineField)
-  phi2d:accumulate(sineWeights:lastInsertedData()/sineNormWeights:lastInsertedData(), sineField)
-  phi2d:sync()
+  --phi2d:clear(0.0)
+  --phi2d:accumulate(cosineWeights:lastInsertedData()/cosineNormWeights:lastInsertedData(), cosineField)
+  --phi2d:accumulate(sineWeights:lastInsertedData()/sineNormWeights:lastInsertedData(), sineField)
+  --phi2d:sync()
   -- compute field energy
   runUpdater(fieldEnergyCalc, curr, dt, {phi2d}, {fieldEnergy})
 end
@@ -512,6 +512,14 @@ function rk3(tCurr, myDt)
   -- compute potential
   calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
   phi2d:sync()
+  -- compute projection of potential on the sine and cosine fields
+  runUpdater(modeProjectionCalc, tCurr, myDt, {phi2d, cosineField}, {cosineWeights})
+  runUpdater(modeProjectionCalc, tCurr, myDt, {phi2d, sineField}, {sineWeights})
+  -- construct the smoothed potential from cosineField and sineField
+  phi2d:clear(0.0)
+  phi2d:accumulate(cosineWeights:lastInsertedData()/cosineNormWeights:lastInsertedData(), cosineField)
+  phi2d:accumulate(sineWeights:lastInsertedData()/sineNormWeights:lastInsertedData(), sineField)
+  phi2d:sync()
   -- Compute hamiltonian
   calcHamiltonian(hamilKE, phi2d, hamil)
 
@@ -529,6 +537,14 @@ function rk3(tCurr, myDt)
   -- compute potential
   calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
   phi2d:sync()
+  -- compute projection of potential on the sine and cosine fields
+  runUpdater(modeProjectionCalc, tCurr, myDt, {phi2d, cosineField}, {cosineWeights})
+  runUpdater(modeProjectionCalc, tCurr, myDt, {phi2d, sineField}, {sineWeights})
+  -- construct the smoothed potential from cosineField and sineField
+  phi2d:clear(0.0)
+  phi2d:accumulate(cosineWeights:lastInsertedData()/cosineNormWeights:lastInsertedData(), cosineField)
+  phi2d:accumulate(sineWeights:lastInsertedData()/sineNormWeights:lastInsertedData(), sineField)
+  phi2d:sync()
   -- Compute hamiltonian
   calcHamiltonian(hamilKE, phi2d, hamil)
 
@@ -545,6 +561,14 @@ function rk3(tCurr, myDt)
   calcNumDensity(f1, numDensityKinetic)
   -- compute potential
   calcPotential(numDensityKinetic, numDensityAdiabatic, phi2d)
+  phi2d:sync()
+  -- compute projection of potential on the sine and cosine fields
+  runUpdater(modeProjectionCalc, tCurr, myDt, {phi2d, cosineField}, {cosineWeights})
+  runUpdater(modeProjectionCalc, tCurr, myDt, {phi2d, sineField}, {sineWeights})
+  -- construct the smoothed potential from cosineField and sineField
+  phi2d:clear(0.0)
+  phi2d:accumulate(cosineWeights:lastInsertedData()/cosineNormWeights:lastInsertedData(), cosineField)
+  phi2d:accumulate(sineWeights:lastInsertedData()/sineNormWeights:lastInsertedData(), sineField)
   phi2d:sync()
   -- Compute hamiltonian
   calcHamiltonian(hamilKE, phi2d, hamil)
