@@ -8,7 +8,7 @@
 -- -pc_type lu -pc_factor_mat_solver_package superlu_dist
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 4, 4, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
