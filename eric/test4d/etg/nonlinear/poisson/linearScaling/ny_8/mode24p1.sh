@@ -3,7 +3,7 @@
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
-#PBS -l nodes=1:ppn=4
+#PBS -l nodes=4:ppn=4
 #PBS -l mem=96000mb
 #PBS -l walltime=48:00:00
 #PBS -r n
