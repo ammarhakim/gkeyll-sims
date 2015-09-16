@@ -6,6 +6,7 @@
 -- 8-31-2015: Testing method of scaling the perturbation
 -- 9-8-2015: Copy of 4.lua modified to isolate a particular ky mode
 -- -pc_type lu -pc_factor_mat_solver_package superlu_dist
+-- omega_r, gamma = 4.09043589  4.83567189 +/-0.00000001
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
@@ -163,7 +164,7 @@ function fProfile(x,y,v,mu)
 end
 
 -- initialize electron distribution function
-initKineticF = Updater.EvalOnNodes4D {
+initKineticF = Updater.ProjectOnNodalBasis4D {
    onGrid = grid_back_4d,
    basis = basis_4d,
    shareCommonNodes = false,
@@ -177,7 +178,7 @@ f:sync()
 
 -- initialize perturbation to electron distribution function
 -- does not contain f_0, instead this will be multiplied with f_0
-initKineticFPerturb = Updater.EvalOnNodes4D {
+initKineticFPerturb = Updater.ProjectOnNodalBasis4D {
    onGrid = grid_4d,
    basis = basis_4d,
    shareCommonNodes = false,
