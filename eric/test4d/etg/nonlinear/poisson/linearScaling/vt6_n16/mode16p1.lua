@@ -6,10 +6,10 @@
 -- 8-31-2015: Testing method of scaling the perturbation
 -- 9-8-2015: Copy of 4.lua modified to isolate a particular ky mode
 -- -pc_type lu -pc_factor_mat_solver_package superlu_dist
--- omega_r, gamma = 4.13945183  5.15584868 +/-0.00000001
+-- omega_r, gamma = 4.13895337  5.15097672 +/-0.00000001
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 2, 8, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -51,8 +51,8 @@ L_T       = R/20
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
-N_Y = 8
-N_VPARA = 64
+N_Y = 16
+N_VPARA = 16
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
