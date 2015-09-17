@@ -6,7 +6,7 @@
 -- 8-31-2015: Testing method of scaling the perturbation
 -- 9-8-2015: Copy of 4.lua modified to isolate a particular ky mode
 -- -pc_type lu -pc_factor_mat_solver_package superlu_dist
--- omega_r, gamma = 3.98692493  4.17552151
+-- omega_r, gamma = 4.13895337  5.15097672 +/-0.00000001
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
