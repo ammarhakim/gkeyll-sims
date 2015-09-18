@@ -9,7 +9,7 @@
 -- omega_r, gamma = 4.13940174  5.15535095 +/-0.00000001
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {2, 2, 1, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 4, 4, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
