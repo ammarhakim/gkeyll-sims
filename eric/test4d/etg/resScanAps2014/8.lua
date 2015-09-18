@@ -11,13 +11,13 @@ confDecomp = DecompRegionCalc2D.SubCartProd4D {
 }
 
 -- polynomial order
-polyOrder = 2
+polyOrder = 1
 
 -- cfl number to use
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = .15e-6
+tEnd = 0.8e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 10
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -46,7 +46,7 @@ ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 4
 N_Y = 8
-N_VPARA = 4
+N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
@@ -56,7 +56,7 @@ Y_UPPER = deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(8, 4*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/B0
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -169,7 +169,7 @@ function fProfile(x,y,v,mu)
 end
 
 -- initialize electron distribution function
-initKineticF = Updater.EvalOnNodes4D {
+initKineticF = Updater.ProjectOnNodalBasis4D {
    onGrid = grid_back_4d,
    basis = basis_4d,
    shareCommonNodes = false,
@@ -183,7 +183,7 @@ f:sync()
 
 -- initialize perturbation to electron distribution function
 -- does not contain f_0, instead this will be multiplied with f_0
-initKineticFPerturb = Updater.EvalOnNodes4D {
+initKineticFPerturb = Updater.ProjectOnNodalBasis4D {
    onGrid = grid_4d,
    basis = basis_4d,
    shareCommonNodes = false,
