@@ -30,7 +30,7 @@ to exist in starting interval 9.16.2015
 # -----------------------------------------------------------------
 # Main inputs:
 
-R_Ln = 0; R_LT = 20; Ts_ov_Ta = 2047.660842256716/2072; kPerpRhoS = 2*pi/32
+R_Ln = 0; R_LT = 20; Ts_ov_Ta = 2071.756587/2072; kPerpRhoS = 2*pi/32
 
 # Search for roots in the range of frequencies (real and imaginary parts
 #  of omega/omega_d):
