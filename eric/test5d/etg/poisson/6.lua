@@ -432,7 +432,7 @@ end
 poissonSlvr = Updater.FemPoisson3D {
    onGrid = grid_3d,
    basis = basis_3d,
-   periodicDirs = {0, 1},
+   periodicDirs = {0, 1, 2},
    sourceNodesShared = false, -- default true
    solutionNodesShared = false, -- default true
    writeStiffnessMatrix = false,
