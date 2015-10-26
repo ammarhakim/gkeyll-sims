@@ -62,7 +62,7 @@ Z_UPPER = L_parallel
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
-MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/(2*B0)
+MU_UPPER = math.min(16, 8*math.sqrt(N_MU/2))*kineticMass*vtKinetic*vtKinetic/B0
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -357,31 +357,11 @@ phi3d = DataStruct.Field3D {
    numComponents = basis_3d:numNodes(),
    ghost = {1, 1},
 }
-phi3dSmoothed = DataStruct.Field3D {
-   onGrid = grid_3d,
-   numComponents = basis_3d:numNodes(),
-   ghost = {1, 1},
-}
 -- to store electrostatic potential for addition to hamiltonian
 phi5d = DataStruct.Field5D {
   onGrid = grid_5d,
   numComponents = basis_5d:numNodes(),
   ghost = {1, 1},
-}
-
--- Updater to compute potential
-phiCalc = Updater.ETGAdiabaticPotentialUpdater3D {
-  onGrid = grid_3d,
-  basis = basis_3d,
-  n0 = n0,
-  adiabaticTemp = adiabaticTemp,
-  adiabaticCharge = adiabaticCharge,
-}
-
--- Updater to smooth out 3d field (phi)
-smoothCalc = Updater.SimpleSmoothToC03D {
-   onGrid = grid_3d,
-   basis = basis_3d,
 }
 
 multiply5dCalc = Updater.FieldArithmeticUpdater5D {
@@ -442,7 +422,7 @@ function calcNumDensity(fIn, nOut)
 end
 
 function calcDiagnostics(curr, dt)
-  runUpdater(fieldEnergyCalc, curr, dt, {phi3dSmoothed}, {fieldEnergy})
+  runUpdater(fieldEnergyCalc, curr, dt, {phi3d}, {fieldEnergy})
   -- Calc perturbed density
   numDensityDelta:copy(numDensityKinetic)
   numDensityDelta:accumulate(-1.0, numDensityAdiabatic)
