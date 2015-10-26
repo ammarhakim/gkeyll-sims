@@ -429,9 +429,9 @@ function calcDiagnostics(curr, dt)
 end
 
 -- create updater to solve Poisson equation
-poissonSlvr = Updater.FemPoisson2D {
-   onGrid = grid_2d,
-   basis = basis_2d,
+poissonSlvr = Updater.FemPoisson3D {
+   onGrid = grid_3d,
+   basis = basis_3d,
    periodicDirs = {0, 1},
    sourceNodesShared = false, -- default true
    solutionNodesShared = false, -- default true
