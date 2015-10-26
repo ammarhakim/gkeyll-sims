@@ -1,4 +1,5 @@
--- Input file for ETG test problem
+-- Input file for ETG test problem in 3x2v slab
+-- Uses gyrokinetic poisson equation
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 
 -- phase-space decomposition
@@ -16,9 +17,9 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 15e-6
+tEnd = 0.1e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-nFrames = 100
+nFrames = 1
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 
 -- physical parameters
@@ -381,7 +382,6 @@ phiCalc = Updater.ETGAdiabaticPotentialUpdater3D {
 smoothCalc = Updater.SimpleSmoothToC03D {
    onGrid = grid_3d,
    basis = basis_3d,
-   polyOrder = polyOrder,
 }
 
 multiply5dCalc = Updater.FieldArithmeticUpdater5D {
@@ -448,6 +448,31 @@ function calcDiagnostics(curr, dt)
   numDensityDelta:accumulate(-1.0, numDensityAdiabatic)
 end
 
+-- create updater to solve Poisson equation
+poissonSlvr = Updater.FemPoisson2D {
+   onGrid = grid_2d,
+   basis = basis_2d,
+   periodicDirs = {0, 1},
+   sourceNodesShared = false, -- default true
+   solutionNodesShared = false, -- default true
+   writeStiffnessMatrix = false,
+   modifierConstant = -kineticTemp/(adiabaticTemp*rho_s^2),
+   isGyroKineticPoisson = true, -- solve 3d GK perp flag
+}
+-- Stores right-hand side of poisson equation
+poissonSource = DataStruct.Field3D {
+   onGrid = grid_3d,
+   numComponents = basis_3d:numNodes(),
+   ghost = {1, 1},
+}
+
+function calcPotential(nKineticIn, nAdiabaticIn, phiOut)
+  poissonSource:copy(nAdiabaticIn)
+  poissonSource:accumulate(-1.0, nKineticIn)
+  poissonSource:scale(-kineticTemp/(n0*rho_s^2)) -- kineticTemp is in eV
+  runUpdater(poissonSlvr, 0.0, 0.0, {poissonSource}, {phiOut})
+end
+
 -- function to take a time-step using SSP-RK3 time-stepping scheme
 function rk3(tCurr, myDt)
   -- RK stage 1
@@ -460,15 +485,11 @@ function rk3(tCurr, myDt)
   applyBcToTotalDistF(f1)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
-  -- compute potential
-  runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
-  -- Apply boundary conditions
+  -- compute potential and apply boundary conditions
+  calcPotential(numDensityKinetic, numDensityAdiabatic, phi3d)
   phi3d:sync()
-  -- smooth potential
-  runUpdater(smoothCalc, tCurr, myDt, {phi3d}, {phi3dSmoothed})
-  phi3dSmoothed:sync()
   -- Compute hamiltonian
-  calcHamiltonian(hamilKE, phi3dSmoothed, hamil)
+  calcHamiltonian(hamilKE, phi3d, hamil)
 
   -- RK stage 2
   local myStatus, myDtSuggested = runUpdater(pbSlvr, tCurr, myDt, {f1, hamil}, {fNew})
@@ -481,15 +502,11 @@ function rk3(tCurr, myDt)
   applyBcToTotalDistF(f1)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
-  -- compute potential
-  runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
-  -- Apply boundary conditions
+  -- compute potential and apply boundary conditions
+  calcPotential(numDensityKinetic, numDensityAdiabatic, phi3d)
   phi3d:sync()
-  -- smooth potential
-  runUpdater(smoothCalc, tCurr, myDt, {phi3d}, {phi3dSmoothed})
-  phi3dSmoothed:sync()
   -- Compute hamiltonian
-  calcHamiltonian(hamilKE, phi3dSmoothed, hamil)
+  calcHamiltonian(hamilKE, phi3d, hamil)
 
   -- RK stage 3
   local myStatus, myDtSuggested = runUpdater(pbSlvr, tCurr, myDt, {f1, hamil}, {fNew})
@@ -502,15 +519,11 @@ function rk3(tCurr, myDt)
   applyBcToTotalDistF(f1)
   -- compute number density
   calcNumDensity(f1, numDensityKinetic)
-  -- compute potential
-  runUpdater(phiCalc, tCurr, myDt, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
-  -- Apply boundary conditions
+  -- compute potential and apply boundary conditions
+  calcPotential(numDensityKinetic, numDensityAdiabatic, phi3d)
   phi3d:sync()
-  -- smooth potential
-  runUpdater(smoothCalc, tCurr, myDt, {phi3d}, {phi3dSmoothed})
-  phi3dSmoothed:sync()
   -- Compute hamiltonian
-  calcHamiltonian(hamilKE, phi3dSmoothed, hamil)
+  calcHamiltonian(hamilKE, phi3d, hamil)
 
   f:copy(f1)
 
@@ -568,14 +581,14 @@ function writeFields(frameNum, tCurr)
    --vParaSquaredKinetic:write( string.format("vParaSq_%d.h5", frameNum), tCurr)
    --hamil:write( string.format("hamil_%d.h5", frameNum), tCurr)
    --f:write( string.format("f_%d.h5", frameNum), tCurr)
-   --phi3d:write( string.format("phiUnsmoothed_%d.h5", frameNum), tCurr)
+   phi3d:write( string.format("phi_%d.h5", frameNum), tCurr)
 end
 
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
 runUpdater(scaleInitDistF, 0.0, 0.0, {numDensityKinetic}, {f})
-f:sync()
+--f:sync()
 -- Recalculate number density
 calcNumDensity(f, numDensityKinetic)
 -- Store static numDensityAdiabatic field
@@ -590,11 +603,9 @@ f:copy(fNew)
 applyBcToTotalDistF(f)
 -- Compute potential with perturbation added
 calcNumDensity(f, numDensityKinetic)
-runUpdater(phiCalc, 0.0, 0.0, {numDensityKinetic, numDensityAdiabatic}, {phi3d})
+calcPotential(numDensityKinetic, numDensityAdiabatic, phi3d)
 phi3d:sync()
-runUpdater(smoothCalc, 0.0, 0.0, {phi3d}, {phi3dSmoothed})
-phi3dSmoothed:sync()
-calcHamiltonian(hamilKE, phi3dSmoothed, hamil)
+calcHamiltonian(hamilKE, phi3d, hamil)
 
 -- Compute diagnostics for t = 0
 calcDiagnostics(0.0, 0.0)
