@@ -169,7 +169,7 @@ function perturbDensityProfile(x,y)
   --local sigma = (X_UPPER-X_LOWER)/4
   --return 1e-2*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
   -- random initial perturbation
-  return 100*(vtKinetic/omega_s)/L_T*math.random(-1,1)
+  return 1e-2*(vtKinetic/omega_s)/L_T*math.random(-1,1)
 end
 
 function fProfile(x,y,v,mu)
