@@ -3,6 +3,7 @@
 -- 4-15-2015: input file to test parallelization
 -- Another attempt at the /noKzfScan1 simulation.
 -- 10-28-2015: properly kinetic ions, adiabatic electrons
+-- 10-29-2015: Larger box size: Lx = 2deltaR, Ly = 4deltaR
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 2, 1} }
@@ -58,7 +59,7 @@ N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
-X_UPPER = R + deltaR
+X_UPPER = R + 2*deltaR
 Y_LOWER = -4*deltaR/2
 Y_UPPER = 4*deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
