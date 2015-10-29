@@ -506,7 +506,7 @@ function calcPotential(nKineticIn, nAdiabaticIn, phiOut)
   -- solve for flux-surface averaged potential
   runUpdater(fluxSurfaceAveragePotentialSlvr, 0.0, 0.0, {sourceFluxSurfaceAveraged2d}, {phiFluxSurfaceAveraged2d})
   -- accumulate flux-surface averaged potential to poissonSource to solve for phi
-  poissonSource:accumulate(-1/(rho_s^2), phiFluxSurfaceAveraged2d)
+  poissonSource:accumulate(1/(rho_s^2), phiFluxSurfaceAveraged2d)
 
   runUpdater(poissonSlvr, 0.0, 0.0, {poissonSource}, {phiOut})
 end
