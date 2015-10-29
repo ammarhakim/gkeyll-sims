@@ -6,7 +6,7 @@
 -- 10-29-2015: Larger box size: Lx = 2deltaR, Ly = 4deltaR
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 2, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 1, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
