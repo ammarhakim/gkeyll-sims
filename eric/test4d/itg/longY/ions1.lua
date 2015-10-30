@@ -3,6 +3,7 @@
 -- 4-15-2015: input file to test parallelization
 -- Another attempt at the /noKzfScan1 simulation.
 -- 10-28-2015: properly kinetic ions, adiabatic electrons
+-- 10-29-2015: R/L_T = 12, dR x 4dR
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }

@@ -4,9 +4,10 @@
 -- Another attempt at the /noKzfScan1 simulation.
 -- 10-28-2015: properly kinetic ions, adiabatic electrons
 -- 10-29-2015: Larger box size: Lx = 2deltaR, Ly = 4deltaR
+-- 10-30-2015: same as ions2.lua, but shorter end time
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 1, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -25,7 +26,7 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 2e-4
+tEnd = 3e-4
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 1000
 tFrame = (tEnd-tStart)/nFrames -- time between frames
@@ -55,7 +56,7 @@ ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 16
 N_Y = 32
-N_VPARA = 4
+N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
