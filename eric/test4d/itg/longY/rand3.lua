@@ -2,7 +2,8 @@
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 -- 4-15-2015: input file to test parallelization
 -- Another attempt at the /noKzfScan1 simulation.
--- Much larger R/L_T
+-- 10-29-2015: correct potential calculation
+-- Much larger R/L_T = 20
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {4, 4, 2, 1} }
