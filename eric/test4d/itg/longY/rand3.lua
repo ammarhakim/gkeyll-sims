@@ -209,7 +209,7 @@ initDensityPerturb = Updater.EvalOnNodes2D {
    basis = basis_2d,
    shareCommonNodes = true,
    -- function to use for initialization
-   evaluate = function (x,y,v,mu,t)
+   evaluate = function (x,y,t)
 		 return 1 + perturbDensityProfile(x,y)
 	 end
 }
