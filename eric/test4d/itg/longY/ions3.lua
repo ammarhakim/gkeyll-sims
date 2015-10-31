@@ -161,7 +161,6 @@ end
 -- domain decomp on ICs.
 r = Lucee.getRank()
 math.randomseed(100000*r+os.time())
-print(os.time())
 function perturbDensityProfile(x,y)
   --linear
   --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)
