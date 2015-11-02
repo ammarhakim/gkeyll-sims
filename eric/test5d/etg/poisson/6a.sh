@@ -3,16 +3,16 @@
 #-- mail on execution("b"), termination ("e"), or interruption ("a")
 #PBS -m ae
 #PBS -M eshi@pppl.gov 
-#PBS -l nodes=2:ppn=32
-#PBS -l mem=120000mb
+#PBS -l nodes=4:ppn=32
+#PBS -l mem=250000mb
 #PBS -l walltime=96:00:00
 #PBS -r n
 #PBS -V 
 #PBS -j oe 
-#PBS -q dtest
+#PBS -q dbrocade
 NPROCS=`wc -l < $PBS_NODEFILE`
 
-CMD="/p/gke/eshi/gkeyllall/par-opt/gkeyll/gkeyll -i 6a.lua -pc_type lu -pc_factor_mat_solver_package superlu_dist -r 100" 
+CMD="/p/gke/eshi/gkeyllall/par-opt/gkeyll/gkeyll -i 6a.lua -pc_type lu -pc_factor_mat_solver_package superlu_dist" 
 cd $PBS_O_WORKDIR 
 mpiexec -np $NPROCS $CMD 
 exit
