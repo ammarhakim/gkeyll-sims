@@ -532,14 +532,14 @@ function calcPotential(nKineticIn, nAdiabaticIn, phiOut)
   poissonSource:scale(-kineticTemp/(n0*rho_s^2)) -- kineticTemp is in eV
 
   -- compute flux-surface average of poissonSource
-  runUpdater(zonalAverageCalc, 0.0, 0.0, {poissonSource}, {zonalAveragedPhi2d})
-  zonalAveragedPhi2d:scale(1/(Y_UPPER-Y_LOWER))
+  --runUpdater(zonalAverageCalc, 0.0, 0.0, {poissonSource}, {zonalAveragedPhi2d})
+  --zonalAveragedPhi2d:scale(1/(Y_UPPER-Y_LOWER))
   -- copy 2d result back to a 3d field for use in poisson solve
-  runUpdater(copy2DTo3D, 0.0, 0.0, {zonalAveragedPhi2d}, {zonalAveragedPhi3d})
+  --runUpdater(copy2DTo3D, 0.0, 0.0, {zonalAveragedPhi2d}, {zonalAveragedPhi3d})
   -- solve for flux-surface averaged potential
-  runUpdater(fluxSurfaceAveragePotentialSlvr, 0.0, 0.0, {zonalAveragedPhi3d}, {zonalAveragedPhiResult3d})
+  --runUpdater(fluxSurfaceAveragePotentialSlvr, 0.0, 0.0, {zonalAveragedPhi3d}, {zonalAveragedPhiResult3d})
   -- accumulate flux-surface averaged potential to poissonSource to solve for phi
-  poissonSource:accumulate(1/(rho_s^2), zonalAveragedPhiResult3d)
+  --poissonSource:accumulate(1/(rho_s^2), zonalAveragedPhiResult3d)
 
   runUpdater(poissonSlvr, 0.0, 0.0, {poissonSource}, {phiOut})
 end
