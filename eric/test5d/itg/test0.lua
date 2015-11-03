@@ -3,6 +3,7 @@
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 -- 10-31-2015: 5d simulation with R/L_T = 4, ITG poisson equation solve
 -- Box size = dR x 4*dR x 2*pi*R*q
+-- Random initial conditions
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 8, 4, 1, 1} }
@@ -177,7 +178,7 @@ function perturbDensityProfile(x,y,z)
   --local sigma = deltaR/4
   --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*
   --  math.exp(-(x-x0)^2/(2*sigma^2))*(1 + math.cos(kz_min*z))
-  return 1e-2*(vtKinetic/omega_s)/L_T*math.random(-1,1)
+  return 1e-2*rho_s/L_T*math.random(-1,1)
 end
 
 function fProfile(x,y,z,v,mu)
