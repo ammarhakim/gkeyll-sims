@@ -2,13 +2,12 @@
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
 -- 4-15-2015: input file to test parallelization
 -- Another attempt at the /noKzfScan1 simulation.
--- 10-28-2015: properly kinetic ions, adiabatic electrons
--- 10-29-2015: Larger box size: Lx = 2deltaR, Ly = 4deltaR
--- 10-30-2015: same as ions3.lua, but shorter end time
--- 11-3-2015: confusion about potential solve
+-- 10-29-2015: correct potential calculation
+-- Back to R/L_T = 6, ETG
+-- Similar to ETG1, but with larger initial amplitude
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {1, 1, 1, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 4, 4, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -27,18 +26,19 @@ polyOrder = 1
 cfl = 0.05
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 3e-4
+tEnd = 10e-6
 dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
 nFrames = 1000
 tFrame = (tEnd-tStart)/nFrames -- time between frames
 tCurr = tStart
 
 -- physical parameters
-eV              = Lucee.ElementaryCharge
-kineticCharge   = Lucee.ElementaryCharge
-adiabaticCharge = -Lucee.ElementaryCharge
-kineticMass     = 2.014*Lucee.ProtonMass -- (deuterium ions)
-adiabaticMass   = Lucee.ElectronMass
+eV            = Lucee.ElementaryCharge
+kineticCharge = -Lucee.ElementaryCharge
+adiabaticCharge = Lucee.ElementaryCharge
+ionMass = 2.014*Lucee.ProtonMass
+kineticMass   = Lucee.ElectronMass
+adiabaticMass = 2.014*Lucee.ProtonMass -- (deuterium ions)
 kineticTemp   = 2072 -- [eV]
 adiabaticTemp = 2072 -- [ev]
 B0 = 1.91   -- [T]
@@ -52,18 +52,18 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/20
+L_T       = R/6
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
-N_X = 16
-N_Y = 32
+N_X = 32
+N_Y = 8
 N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
-X_UPPER = R + 2*deltaR
-Y_LOWER = -4*deltaR/2
-Y_UPPER = 4*deltaR/2
+X_UPPER = R + 4*deltaR
+Y_LOWER = -deltaR/2
+Y_UPPER = deltaR/2
 VPARA_UPPER = math.min(4, 2.5*math.sqrt(N_VPARA/4))*vtKinetic
 VPARA_LOWER = -VPARA_UPPER
 MU_LOWER = 0
@@ -170,7 +170,7 @@ function perturbDensityProfile(x,y)
   --local sigma = (X_UPPER-X_LOWER)/4
   --return 1e-2*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
   -- random initial perturbation
-  return 1e-2*(vtKinetic/omega_s)/L_T*math.random(-1,1)
+  return 40*1e-2*(vtKinetic/omega_s)/L_T*math.random(-1,1)
 end
 
 function fProfile(x,y,v,mu)
@@ -209,7 +209,7 @@ initDensityPerturb = Updater.EvalOnNodes2D {
    basis = basis_2d,
    shareCommonNodes = true,
    -- function to use for initialization
-   evaluate = function (x,y,v,mu,t)
+   evaluate = function (x,y,t)
 		 return 1 + perturbDensityProfile(x,y)
 	 end
 }
@@ -349,16 +349,8 @@ numDensityKinetic = DataStruct.Field2D {
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
 }
-numDensityAdiabatic = DataStruct.Field2D {
-   onGrid = grid_back_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
-}
-numDensityDelta = DataStruct.Field2D {
-   onGrid = grid_back_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
-}
+numDensityAdiabatic = numDensityKinetic:duplicate()
+numDensityDelta = numDensityKinetic:duplicate()
 -- to compute number density
 numDensityCalc = Updater.DistFuncMomentCalcWeighted2D {
    -- 4D phase-space grid 
@@ -407,49 +399,6 @@ multiply4dCalc = Updater.FieldArithmeticUpdater4D {
   evaluate = function(fld1, fld2)
     return fld1*fld2
   end
-}
-
--- create updater to solve Poisson equation for flux-surface averaged potential
-fluxSurfaceAveragePotentialSlvr = Updater.FemPoisson2D {
-   onGrid = grid_2d,
-   basis = basis_2d,
-   periodicDirs = {0, 1},
-   sourceNodesShared = false, -- default true
-   solutionNodesShared = false, -- default true
-   writeStiffnessMatrix = false,
-}
-
--- updater to compute flux surface (y) average of potential
-fluxSurfaceAverageCalc = Updater.DistFuncMomentCalc1D {
-  onGrid = grid_2d,
-  basis1d = basis_1d,
-  basis2d = basis_2d,
-  moment = 0,
-}
-
--- updater to copy flux surace (y) averaged potential back to a 2d field
-copy1DTo2D = Updater.CopyNodalFields1D_2D {
-   onGrid = grid_2d,
-   sourceBasis = basis_1d,
-   targetBasis = basis_2d
-}
-
-sourceFluxSurfaceAveraged1d = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numNodes(),
-   ghost = {1, 1},
-}
-
-sourceFluxSurfaceAveraged2d = DataStruct.Field2D {
-   onGrid = grid_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
-}
-
-phiFluxSurfaceAveraged2d = DataStruct.Field2D {
-   onGrid = grid_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
 }
 
 function applyBcToTotalDistF(fld)
@@ -505,18 +454,7 @@ end
 function calcPotential(nKineticIn, nAdiabaticIn, phiOut)
   poissonSource:copy(nAdiabaticIn)
   poissonSource:accumulate(-1.0, nKineticIn)
-  poissonSource:scale(kineticTemp/(n0*rho_s^2)) -- kineticTemp is in eV
-
-  -- compute flux-surface average of poissonSource
-  runUpdater(fluxSurfaceAverageCalc, 0.0, 0.0, {poissonSource}, {sourceFluxSurfaceAveraged1d})
-  sourceFluxSurfaceAveraged1d:scale(1/(Y_UPPER-Y_LOWER))
-  -- copy 1d result back to a 2d field for use in poisson solve
-  runUpdater(copy1DTo2D, 0.0, 0.0, {sourceFluxSurfaceAveraged1d}, {sourceFluxSurfaceAveraged2d})
-  -- solve for flux-surface averaged potential
-  runUpdater(fluxSurfaceAveragePotentialSlvr, 0.0, 0.0, {sourceFluxSurfaceAveraged2d}, {phiFluxSurfaceAveraged2d})
-  -- accumulate flux-surface averaged potential to poissonSource to solve for phi
-  poissonSource:accumulate(-1/(rho_s^2), phiFluxSurfaceAveraged2d)
-
+  poissonSource:scale(-kineticTemp/(n0*rho_s^2)) -- kineticTemp is in eV
   runUpdater(poissonSlvr, 0.0, 0.0, {poissonSource}, {phiOut})
 end
 
@@ -633,7 +571,6 @@ function writeFields(frameNum, tCurr)
   numDensityDelta:write( string.format("nDelta_%d.h5", frameNum), tCurr)
   f:write( string.format("f_%d.h5", frameNum), tCurr)
 end
-
 -- Compute initial kinetic density
 calcNumDensity(f, numDensityKinetic)
 -- Scale distribution function and apply bcs
