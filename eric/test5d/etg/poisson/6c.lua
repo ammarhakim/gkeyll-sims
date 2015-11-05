@@ -1,9 +1,10 @@
 -- Input file for ETG test problem in 3x2v slab
 -- Uses gyrokinetic poisson equation
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
+-- Random initial conditions
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 8, 4, 1, 1} }
+phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 8, 4, 4, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc3D.SubCartProd5D {
    decomposition = phaseDecomp,
@@ -51,7 +52,7 @@ kz_min     = 2*math.pi/L_parallel
 N_X = 8
 N_Y = 32
 N_Z = 8
-N_VPARA = 4
+N_VPARA = 8
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
@@ -152,11 +153,6 @@ fFluctuating = DataStruct.Field5D {
    numComponents = basis_5d:numNodes(),
    ghost = {1, 1},
 }
-fInitialPerturb = DataStruct.Field5D {
-   onGrid = grid_5d,
-   numComponents = basis_5d:numNodes(),
-   ghost = {1, 1},
-}
 
 function bFieldProfile(x)
   return B0*R/x
@@ -166,11 +162,16 @@ function kineticTempProfile(x)
   return kineticTemp*(1 - (x-R)/L_T)
 end
 
+-- set random seed based on processor number to avoid imprinting
+-- domain decomp on ICs.
+r = Lucee.getRank()
+math.randomseed(100000*r+os.time())
 function perturbDensityProfile(x,y,z)
-  local x0 = (X_LOWER+X_UPPER)/2
-  local sigma = deltaR/4
-  return 1e-2*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*
-    math.exp(-(x-x0)^2/(2*sigma^2))*(1 + math.cos(kz_min*z))
+  --local x0 = (X_LOWER+X_UPPER)/2
+  --local sigma = deltaR/4
+  --return 1e-3*(vtKinetic/omega_s)/L_T*math.cos(ky_min*y)*
+  --  math.exp(-(x-x0)^2/(2*sigma^2))*(1 + math.cos(kz_min*z))
+  return 40*1e-2*rho_s/L_T*math.random(-1,1)
 end
 
 function fProfile(x,y,z,v,mu)
@@ -192,19 +193,49 @@ initKineticF = Updater.EvalOnNodes5D {
 runUpdater(initKineticF, 0.0, 0.0, {}, {f})
 f:sync()
 
+nInitialPerturbCG = DataStruct.Field3D {
+   onGrid = grid_3d,
+   numComponents = basis_3d:numExclusiveNodes(),
+   ghost = {1, 1},
+}
+nInitialPerturbDG = DataStruct.Field3D {
+   onGrid = grid_3d,
+   numComponents = basis_3d:numNodes(),
+   ghost = {1, 1},
+}
 -- initialize perturbation to electron distribution function
 -- does not contain f_0, instead this will be multiplied with f_0
-initKineticFPerturb = Updater.EvalOnNodes5D {
-   onGrid = grid_5d,
-   basis = basis_5d,
-   shareCommonNodes = false,
+initDensityPerturb = Updater.EvalOnNodes3D {
+   onGrid = grid_3d,
+   basis = basis_3d,
+   shareCommonNodes = true,
    -- function to use for initialization
-   evaluate = function (x,y,z,v,mu,t)
+   evaluate = function (x,y,z,t)
 		 return 1 + perturbDensityProfile(x,y,z)
 	 end
 }
-runUpdater(initKineticFPerturb, 0.0, 0.0, {}, {fInitialPerturb})
-fInitialPerturb:sync()
+runUpdater(initDensityPerturb, 0.0, 0.0, {}, {nInitialPerturbCG})
+nInitialPerturbCG:sync()
+-- copy nInitialPerturb to a DG field
+-- create updater to copy a continuous 3D field to a 3D discontinuous field
+copyCToD3d = Updater.CopyContToDisCont3D {
+   onGrid = grid_3d,
+   basis = basis_3d,
+}
+runUpdater(copyCToD3d, 0.0, 0.0, {nInitialPerturbCG}, {nInitialPerturbDG})
+-- Copy 3d dg density perturbation to a 5d field
+fInitialPerturb = DataStruct.Field5D {
+   onGrid = grid_5d,
+   numComponents = basis_5d:numNodes(),
+   ghost = {1, 1},
+}
+-- to copy phi to a 5d field
+copy3dTo5d = Updater.CopyNodalFields3D_5D {
+  onGrid = grid_5d,
+  targetBasis = basis_5d,
+  sourceBasis = basis_3d,
+}
+runUpdater(copy3dTo5d, 0.0, 0.0, {nInitialPerturbDG}, {fInitialPerturb})
 
 -- Magnetic Field (3D)
 bField3d = DataStruct.Field3D {
@@ -607,10 +638,10 @@ writeFields(startFrame-1,tCurr)
 
 tCurr = tStart
 
-for frame = startFrame, nFrames do
-  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
-  dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
-  tCurr = tCurr+tFrame
-  writeFields(frame, tCurr)
-  Lucee.logInfo ("")
-end
+--for frame = startFrame, nFrames do
+--  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
+--  dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
+--  tCurr = tCurr+tFrame
+--  writeFields(frame, tCurr)
+--  Lucee.logInfo ("")
+--end
