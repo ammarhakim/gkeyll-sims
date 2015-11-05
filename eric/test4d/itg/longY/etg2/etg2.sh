@@ -9,10 +9,9 @@
 #PBS -r n
 #PBS -V 
 #PBS -j oe 
-#PBS -q kruskal
 NPROCS=`wc -l < $PBS_NODEFILE`
 
-CMD="/p/gke/eshi/gkeyllall/par-opt/gkeyll/gkeyll -i etg1.lua -pc_type lu -pc_factor_mat_solver_package superlu_dist"
+CMD="/p/gke/eshi/gkeyllall/par-opt/gkeyll/gkeyll -i etg2.lua -pc_type lu -pc_factor_mat_solver_package superlu_dist"
 cd $PBS_O_WORKDIR 
 mpiexec -np $NPROCS $CMD 
 exit
