@@ -4,7 +4,7 @@
 -- 11-5-15: Random initial conditions, R/L_T = 6
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 8, 4, 4, 1} }
+phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 8, 4, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc3D.SubCartProd5D {
    decomposition = phaseDecomp,
@@ -638,10 +638,10 @@ writeFields(startFrame-1,tCurr)
 
 tCurr = tStart
 
---for frame = startFrame, nFrames do
---  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
---  dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
---  tCurr = tCurr+tFrame
---  writeFields(frame, tCurr)
---  Lucee.logInfo ("")
---end
+for frame = startFrame, nFrames do
+  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
+  dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
+  tCurr = tCurr+tFrame
+  writeFields(frame, tCurr)
+  Lucee.logInfo ("")
+end

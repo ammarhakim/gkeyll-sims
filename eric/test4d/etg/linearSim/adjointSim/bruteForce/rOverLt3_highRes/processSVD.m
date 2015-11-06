@@ -7,7 +7,7 @@ function processMatrices_3
   clear data
 
   gammaMax = max(real(diag(D)));
-  tPoints = linspace(0, 40e-6, 10);
+  tPoints = linspace(0, 1e-6, 5);
   gPoints = zeros(1,length(tPoints));
 
   parfor i = 1:length(tPoints)
