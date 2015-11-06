@@ -4,7 +4,7 @@
 -- 11-5-15: Random initial conditions, R/L_T = 6
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 8, 4, 2, 1} }
+phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {4, 8, 4, 1, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc3D.SubCartProd5D {
    decomposition = phaseDecomp,
