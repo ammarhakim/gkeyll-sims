@@ -638,10 +638,10 @@ writeFields(startFrame-1,tCurr)
 
 tCurr = tStart
 
---for frame = startFrame, nFrames do
---  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
---  dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
---  tCurr = tCurr+tFrame
---  writeFields(frame, tCurr)
---  Lucee.logInfo ("")
---end
+for frame = startFrame, nFrames do
+  Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
+  dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
+  tCurr = tCurr+tFrame
+  writeFields(frame, tCurr)
+  Lucee.logInfo ("")
+end
