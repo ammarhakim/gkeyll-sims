@@ -7,7 +7,7 @@
 -- 10-30-2015: same as ions3.lua, but shorter end time
 -- 11-3-2015: confusion about potential solve
 -- 11-11-2015: modified temperature profile so T_0 is temperature at center
--- R/L_T = 6
+-- R/L_T = 12
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 2, 1} }
@@ -54,7 +54,7 @@ c_s       = math.sqrt(kineticTemp*eV/kineticMass)
 omega_s   = math.abs(kineticCharge*B0/kineticMass)
 rho_s     = c_s/omega_s
 deltaR    = 32*rho_s
-L_T       = R/6
+L_T       = R/4
 ky_min    = 2*math.pi/deltaR
 -- grid parameters: number of cells
 N_X = 16
@@ -195,12 +195,53 @@ initKineticF = Updater.EvalOnNodes4D {
 runUpdater(initKineticF, 0.0, 0.0, {}, {f})
 f:sync()
 
+-- updater to compute flux surface (y) average of potential
+fluxSurfaceAverageCalc = Updater.DistFuncMomentCalc1D {
+  onGrid = grid_2d,
+  basis1d = basis_1d,
+  basis2d = basis_2d,
+  moment = 0,
+}
+-- updater to copy flux surace (y) averaged potential back to a 2d field
+copy1DTo2D = Updater.CopyNodalFields1D_2D {
+   onGrid = grid_2d,
+   sourceBasis = basis_1d,
+   targetBasis = basis_2d
+}
+
+sourceFluxSurfaceAveraged1d = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+
+sourceFluxSurfaceAveraged2d = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+
+phiFluxSurfaceAveraged2d = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
 nInitialPerturbCG = DataStruct.Field2D {
    onGrid = grid_2d,
    numComponents = basis_2d:numExclusiveNodes(),
    ghost = {1, 1},
 }
 nInitialPerturbDG = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+nInitialPerturbAvg = DataStruct.Field2D {
+   onGrid = grid_2d,
+   numComponents = basis_2d:numNodes(),
+   ghost = {1, 1},
+}
+nInitialTotalDG = DataStruct.Field2D {
    onGrid = grid_2d,
    numComponents = basis_2d:numNodes(),
    ghost = {1, 1},
@@ -213,7 +254,7 @@ initDensityPerturb = Updater.EvalOnNodes2D {
    shareCommonNodes = true,
    -- function to use for initialization
    evaluate = function (x,y,v,mu,t)
-		 return 1 + perturbDensityProfile(x,y)
+		 return perturbDensityProfile(x,y)
 	 end
 }
 runUpdater(initDensityPerturb, 0.0, 0.0, {}, {nInitialPerturbCG})
@@ -225,6 +266,18 @@ copyCToD2d = Updater.CopyContToDisCont2D {
    basis = basis_2d,
 }
 runUpdater(copyCToD2d, 0.0, 0.0, {nInitialPerturbCG}, {nInitialPerturbDG})
+-- Compute zonal average of perturbed density
+-- compute flux-surface average of poissonSource
+runUpdater(fluxSurfaceAverageCalc, 0.0, 0.0, {nInitialPerturbDG}, {sourceFluxSurfaceAveraged1d})
+sourceFluxSurfaceAveraged1d:scale(1/(Y_UPPER-Y_LOWER))
+-- copy 1d result back to a 2d field for use in poisson solve
+runUpdater(copy1DTo2D, 0.0, 0.0, {sourceFluxSurfaceAveraged1d}, {nInitialPerturbAvg})
+-- Subtract zonal component from perturbed density
+nInitialPerturbDG:accumulate(-1.0, nInitialPerturbAvg)
+-- Add perturbation to background constant density
+nInitialTotalDG:clear(1.0)
+nInitialTotalDG:accumulate(1.0, nInitialPerturbDG)
+
 -- Copy 2d dg density perturbation to a 4d field
 fInitialPerturb = DataStruct.Field4D {
    onGrid = grid_4d,
@@ -236,7 +289,7 @@ copy2DTo4D = Updater.CopyNodalFields2D_4D {
    sourceBasis = basis_2d,
    targetBasis = basis_4d,
 }
-runUpdater(copy2DTo4D, 0.0, 0.0, {nInitialPerturbDG}, {fInitialPerturb})
+runUpdater(copy2DTo4D, 0.0, 0.0, {nInitialTotalDG}, {fInitialPerturb})
 
 -- Magnetic Field (2D)
 bField2d = DataStruct.Field2D {
@@ -412,39 +465,6 @@ fluxSurfaceAveragePotentialSlvr = Updater.FemPoisson2D {
    sourceNodesShared = false, -- default true
    solutionNodesShared = false, -- default true
    writeStiffnessMatrix = false,
-}
-
--- updater to compute flux surface (y) average of potential
-fluxSurfaceAverageCalc = Updater.DistFuncMomentCalc1D {
-  onGrid = grid_2d,
-  basis1d = basis_1d,
-  basis2d = basis_2d,
-  moment = 0,
-}
-
--- updater to copy flux surace (y) averaged potential back to a 2d field
-copy1DTo2D = Updater.CopyNodalFields1D_2D {
-   onGrid = grid_2d,
-   sourceBasis = basis_1d,
-   targetBasis = basis_2d
-}
-
-sourceFluxSurfaceAveraged1d = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numNodes(),
-   ghost = {1, 1},
-}
-
-sourceFluxSurfaceAveraged2d = DataStruct.Field2D {
-   onGrid = grid_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
-}
-
-phiFluxSurfaceAveraged2d = DataStruct.Field2D {
-   onGrid = grid_2d,
-   numComponents = basis_2d:numNodes(),
-   ghost = {1, 1},
 }
 
 function applyBcToTotalDistF(fld)
