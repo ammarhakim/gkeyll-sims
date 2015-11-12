@@ -10,7 +10,7 @@
 -- R/L_T = 12
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 4, 1} }
+phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 8, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc2D.SubCartProd4D {
    decomposition = phaseDecomp,
@@ -158,7 +158,7 @@ end
 
 function kineticTempProfile(x)
   local xMid = 0.5*(X_LOWER + X_UPPER)
-  return kineticTemp*(1 - (x-xMid/L_T)
+  return kineticTemp*(1 - (x-xMid)/L_T)
 end
 
 -- set random seed based on processor number to avoid imprinting
