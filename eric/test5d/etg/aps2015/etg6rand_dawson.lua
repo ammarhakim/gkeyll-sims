@@ -624,6 +624,7 @@ else
   f:copy(fNew)
   -- Apply boundary conditions
   applyBcToTotalDistF(f)
+  tCurr = tStart
 end
 
 -- Compute potential with perturbation added
@@ -635,8 +636,6 @@ calcHamiltonian(hamilKE, phi3d, hamil)
 -- Compute diagnostics for t = 0
 calcDiagnostics(tCurr, 0.0)
 writeFields(startFrame-1,tCurr)
-
-tCurr = tStart
 
 for frame = startFrame, nFrames do
   Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
