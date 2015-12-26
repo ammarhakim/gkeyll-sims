@@ -254,17 +254,6 @@ initb = Updater.EvalOnNodes3D {
 }
 runUpdater(initb, 0.0, 0.0, {}, {bField3d})
 bField3d:sync()
--- to copy phi to a 5d field
-copy3dTo5d = Updater.NodalCopy3DTo5DFieldUpdater {
-  -- 5D phase-space grid 
-  onGrid = grid_5d,
-  -- 5D phase-space basis functions
-  basis5d = basis_5d,
-  -- 3D spatial basis functions
-  basis3d = basis_3d,
-  -- Basis function order
-  polyOrder = polyOrder,
-}
 
 -- Jacobian Factor (5D)
 jacobianField = DataStruct.Field5D {
