@@ -4,7 +4,7 @@
 -- 11-5-15: Random initial conditions, R/L_T = 6
 
 -- phase-space decomposition
-phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {8, 4, 4, 4, 1} }
+phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {16, 4, 4, 2, 1} }
 -- configuration space decomposition
 confDecomp = DecompRegionCalc3D.SubCartProd5D {
    decomposition = phaseDecomp,
@@ -52,7 +52,7 @@ kz_min     = 2*math.pi/L_parallel
 N_X = 32
 N_Y = 8
 N_Z = 8
-N_VPARA = 8
+N_VPARA = 4
 N_MU = N_VPARA/2
 -- grid parameters: domain extent
 X_LOWER = R
