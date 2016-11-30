@@ -6,6 +6,7 @@
 -- Back to R/L_T = 6, ETG
 -- Similar to ETG1, but with larger initial amplitude
 -- Similar to ETG2, but 2x larger in y
+-- 01-25-2016: Consider this the state of the art 4D ETG run
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc4D.CartProd { cuts = {8, 4, 4, 1} }

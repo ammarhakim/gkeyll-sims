@@ -833,34 +833,27 @@ function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
 end
 
 -- to compute second order hamiltonian term
---mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
---  onGrid = grid_1d,
---  basis = basis_1d,
---}
+mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+}
 -- store result of mhdHamiltonianCalc
---mhdHamiltonian1dDg = DataStruct.Field1D {
---   onGrid = grid_1d,
---   numComponents = basis_1d:numNodes(),
---   ghost = {1, 1},
---}
+mhdHamiltonian1dDg = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
 -- result of mhdHamiltonianCalc as continuous field
---mhdHamiltonian1d = DataStruct.Field1D {
---   onGrid = grid_1d,
---   numComponents = basis_1d:numExclusiveNodes(),
---   ghost = {1, 1},
---}
---mhdHamiltonian2d = DataStruct.Field3D {
---   onGrid = gridIon,
---   numComponents = basisIon:numExclusiveNodes(),
---   ghost = {1, 1},
---}
---mhdHamiltonian2dDg = DataStruct.Field2D {
---   onGrid = gridIon,
---   numComponents = basisIon:numNodes(),
---   ghost = {1, 1},
---}
--- stores mhd hamiltonian contribution to total energy
---mhdHamiltonianEnergy = DataStruct.DynVector { numComponents = 1, }
+mhdHamiltonian1d = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numExclusiveNodes(),
+   ghost = {1, 1},
+}
+mhdHamiltonian3d = DataStruct.Field3D {
+   onGrid = gridIon,
+   numComponents = basisIon:numExclusiveNodes(),
+   ghost = {1, 1},
+}
 
 -- compute hamiltonian for electrons
 function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
@@ -875,12 +868,12 @@ function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
    hamilOut:accumulate(1.0, hamilIonKeDg)
 
    -- compute second order hamiltonian term
-   --runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
-   --runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
-   --runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
-   --runUpdater(copyTo2DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian2d})
-   --mhdHamiltonian2d:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
-   --hamilOut:accumulate(1.0, mhdHamiltonian2d)
+   runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
+   runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
+   runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
+   runUpdater(copyTo3DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian3d})
+   mhdHamiltonian3d:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
+   hamilOut:accumulate(1.0, mhdHamiltonian3d)
 end
 
 -- Outflow BCs
