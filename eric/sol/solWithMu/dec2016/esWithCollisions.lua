@@ -1,4 +1,5 @@
 -- Input file for SOL problem with kinetic ions and electrons (1d2v) with lb collisions
+-- Modified to be energy-conserving in the collision operator
 
 -- polynomial order
 polyOrder = 2
@@ -814,10 +815,10 @@ integratedNumDensityElc = DataStruct.DynVector { numComponents = 1, }
 integratedNumDensityIon = DataStruct.DynVector { numComponents = 1, }
 
 -- updater to move a 1d discontinuous field to a 1d continuous field
---contFromDisContCalc = Updater.ContFromDisCont1D {
---   onGrid = grid_1d,
---   basis = basis_1d,
---}
+contFromDisContCalc = Updater.ContFromDisCont1D {
+   onGrid = grid_1d,
+   basis = basis_1d,
+}
 
 -- compute hamiltonian for electrons
 function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
@@ -833,34 +834,27 @@ function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
 end
 
 -- to compute second order hamiltonian term
---mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
---  onGrid = grid_1d,
---  basis = basis_1d,
---}
+mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+}
 -- store result of mhdHamiltonianCalc
---mhdHamiltonian1dDg = DataStruct.Field1D {
---   onGrid = grid_1d,
---   numComponents = basis_1d:numNodes(),
---   ghost = {1, 1},
---}
+mhdHamiltonian1dDg = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
 -- result of mhdHamiltonianCalc as continuous field
---mhdHamiltonian1d = DataStruct.Field1D {
---   onGrid = grid_1d,
---   numComponents = basis_1d:numExclusiveNodes(),
---   ghost = {1, 1},
---}
---mhdHamiltonian2d = DataStruct.Field3D {
---   onGrid = gridIon,
---   numComponents = basisIon:numExclusiveNodes(),
---   ghost = {1, 1},
---}
---mhdHamiltonian2dDg = DataStruct.Field2D {
---   onGrid = gridIon,
---   numComponents = basisIon:numNodes(),
---   ghost = {1, 1},
---}
--- stores mhd hamiltonian contribution to total energy
---mhdHamiltonianEnergy = DataStruct.DynVector { numComponents = 1, }
+mhdHamiltonian1d = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numExclusiveNodes(),
+   ghost = {1, 1},
+}
+mhdHamiltonian3dDg = DataStruct.Field3D {
+   onGrid = gridIon,
+   numComponents = basisIon:numNodes(),
+   ghost = {1, 1},
+}
 
 -- compute hamiltonian for electrons
 function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
@@ -875,12 +869,15 @@ function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
    hamilOut:accumulate(1.0, hamilIonKeDg)
 
    -- compute second order hamiltonian term
-   --runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
-   --runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
-   --runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
-   --runUpdater(copyTo2DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian2d})
-   --mhdHamiltonian2d:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
-   --hamilOut:accumulate(1.0, mhdHamiltonian2d)
+   runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
+   runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
+   -- make mhd hamiltonian continuous
+   runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
+   -- copy back to dg field
+   runUpdater(copyCToD1d, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian1dDg})
+   runUpdater(copyTo3DIonDg, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian3dDg})
+   mhdHamiltonian3dDg:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
+   hamilOut:accumulate(1.0, mhdHamiltonian3dDg)
 end
 
 -- Outflow BCs
@@ -957,6 +954,20 @@ wallElcTempCalc = Updater.SOL3DElectronTempAtWallCalc {
   B0 = B0,
 }
 
+-- Output dynvector for computing stored energy
+storedElcEnergy = DataStruct.DynVector { numComponents = 1, }
+storedIonEnergy = DataStruct.DynVector { numComponents = 1, }
+storedEnergyElcCalc = Updater.SOLTotalIntegralCalc3D {
+  onGrid = gridElc,
+  basis = basisElc,
+  scaleFactor = 2*math.pi*B0/elcMass,
+}
+storedEnergyIonCalc = Updater.SOLTotalIntegralCalc3D {
+  onGrid = gridIon,
+  basis = basisIon,
+  scaleFactor = 2*math.pi*B0/ionMass,
+}
+
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
   -- compute moments at edges
@@ -976,18 +987,93 @@ function calcDiagnostics(curr, dt)
   -- compute heat flux at edges
   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
   momentsAtEdgesIon, tElc, tIon, wallElcTemp}, {heatFluxAtEdge, sheathCoefficients})
+  -- compute stored energy of each species
+  runUpdater(storedEnergyElcCalc, curr, dt, {distfElc, hamilElc}, {storedElcEnergy})
+  runUpdater(storedEnergyIonCalc, curr, dt, {distfIon, hamilIon}, {storedIonEnergy})
+end
+
+-- calculate average energy in each cell
+energyInCellDrag = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+energyInCellDiff = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
+energyInCellCalcElc = Updater.SOLEnergyAtCellCalc3D {
+  onGrid = gridElc,
+  basis3d = basisElc,
+  basis1d = basis_1d,
+  scaleFactor = 2*math.pi*B0/elcMass,
+}
+energyInCellCalcIon = Updater.SOLEnergyAtCellCalc3D {
+  onGrid = gridIon,
+  basis3d = basisIon,
+  basis1d = basis_1d,
+  scaleFactor = 2*math.pi*B0/ionMass,
+}
+collisionEnergyScaleElc = Updater.SOLLenardBernsteinScaleCell3D {
+  onGrid = gridElc,
+  basis3d = basisElc,
+  basis1d = basis_1d,
+}
+collisionEnergyScaleIon = Updater.SOLLenardBernsteinScaleCell3D {
+  onGrid = gridIon,
+  basis3d = basisIon,
+  basis1d = basis_1d,
+}
+
+function calcLenardBernsteinElc(tCurr, myDt, distfStart, distfMod)
+  local dragStatusElc, dragDtSuggestedElc = runUpdater(dragSlvrElc, tCurr, myDt, {distfStart, driftUElc}, {distfCollisionsElc})
+  distfMod:accumulate(myDt, distfCollisionsElc)
+  runUpdater(energyInCellCalcElc, tCurr, myDt, {distfCollisionsElc, hamilElc}, {energyInCellDrag})
+
+  -- calc energy of drag term without myDt
+  local diffStatusElc, diffDtSuggestedElc = runUpdater(diffSlvrElc, tCurr, myDt, {distfStart, vThermSq3dElc}, {distfCollisionsElc})
+  runUpdater(energyInCellCalcElc, tCurr, myDt, {distfCollisionsElc, hamilElc}, {energyInCellDiff})
+
+  if (diffStatusElc == false) or (dragStatusElc == false) then
+    return false, math.min(dragDtSuggestedElc,diffDtSuggestedElc)
+  end
+
+  -- accumulate correct amount of diffusion to distribution function
+  -- such that no energy is added via collisions
+  runUpdater(collisionEnergyScaleElc, tCurr, myDt, {distfCollisionsElc, energyInCellDrag, energyInCellDiff}, {distfMod})
+
+  return true, math.min(dragDtSuggestedElc,diffDtSuggestedElc)
+end
+
+function calcLenardBernsteinIon(tCurr, myDt, distfStart, distfMod)
+  local dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distfStart, driftUIon}, {distfCollisionsIon})
+  distfMod:accumulate(myDt, distfCollisionsIon)
+  runUpdater(energyInCellCalcIon, tCurr, myDt, {distfCollisionsIon, hamilIon}, {energyInCellDrag})
+
+  -- calc energy of drag term without myDt
+  local diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distfStart, vThermSq3dIon}, {distfCollisionsIon})
+  runUpdater(energyInCellCalcIon, tCurr, myDt, {distfCollisionsIon, hamilIon}, {energyInCellDiff})
+
+  if (diffStatusIon == false) or (dragStatusIon == false) then
+    return false, math.min(dragDtSuggestedIon,diffDtSuggestedIon)
+  end
+
+  -- accumulate correct amount of diffusion to distribution function
+  -- such that no energy is added via collisions
+  runUpdater(collisionEnergyScaleIon, tCurr, myDt, {distfCollisionsIon, energyInCellDrag, energyInCellDiff}, {distfMod})
+
+  return true, math.min(dragDtSuggestedIon,diffDtSuggestedIon)
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
 function rk3(tCurr, myDt)
   local statusElc, dtSuggestedElc
   local pbStatusElc, pbDtSuggestedElc
-  local diffStatusElc, diffDtSuggestedElc
-  local dragStatusElc, dragDtSuggestedElc
+  local lbStatusElc, lbDtSuggestedElc
   local statusIon, dtSuggestedIon
   local pbStatusIon, pbDtSuggestedIon
-  local diffStatusIon, diffDtSuggestedIon
-  local dragStatusIon, dragDtSuggestedIon
+  local lbStatusIon, lbDtSuggestedIon
 
   if (postELM == false) then
    if tCurr + myDt > tELM then
@@ -999,10 +1085,17 @@ function rk3(tCurr, myDt)
 
   -- RK stage 1
   pbStatusElc, pbDtSuggestedElc = runUpdater(pbSlvrElc, tCurr, myDt, {distfElc, hamilElc}, {distf1Elc})
+  lbStatusElc, lbDtSuggestedElc = calcLenardBernsteinElc(tCurr, myDt, distfElc, distf1Elc)
   pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distfIon, hamilIon}, {distf1Ion})
-  
-  if (pbStatusElc == false) or (pbStatusIon == false) then
-    return false, math.min(pbDtSuggestedElc, pbDtSuggestedIon)
+  lbStatusIon, lbDtSuggestedIon = calcLenardBernsteinIon(tCurr, myDt, distfIon, distf1Ion)
+
+  statusElc = (pbStatusElc and lbStatusElc)
+  statusIon = (pbStatusIon and lbStatusIon)
+  dtSuggestedElc = math.min(pbDtSuggestedElc, lbDtSuggestedElc)
+  dtSuggestedIon = math.min(pbDtSuggestedIon, lbDtSuggestedIon)
+
+  if (statusElc == false) or (statusIon == false) then
+    return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
   distf1Elc:accumulate(myDt, particleSourceElc)
@@ -1023,10 +1116,18 @@ function rk3(tCurr, myDt)
 
   -- RK stage 2
   pbStatusElc, pbDtSuggestedElc = runUpdater(pbSlvrElc, tCurr, myDt, {distf1Elc, hamilElc}, {distfNewElc})
-  pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
+  lbStatusElc, lbDtSuggestedElc = calcLenardBernsteinElc(tCurr, myDt, distf1Elc, distfNewElc)
 
-  if (pbStatusElc == false) or (pbStatusIon == false) then
-    return false, math.min(pbDtSuggestedElc, pbDtSuggestedIon)
+  pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
+  lbStatusIon, lbDtSuggestedIon = calcLenardBernsteinIon(tCurr, myDt, distf1Ion, distfNewIon)
+
+  statusElc = (pbStatusElc and lbStatusElc)
+  statusIon = (pbStatusIon and lbStatusIon)
+  dtSuggestedElc = math.min(pbDtSuggestedElc, lbDtSuggestedElc)
+  dtSuggestedIon = math.min(pbDtSuggestedIon, lbDtSuggestedIon)
+
+  if (statusElc == false) or (statusIon == false) then
+    return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
   distfNewElc:accumulate(myDt, particleSourceElc)
@@ -1050,10 +1151,18 @@ function rk3(tCurr, myDt)
 
   -- RK stage 3
   pbStatusElc, pbDtSuggestedElc = runUpdater(pbSlvrElc, tCurr, myDt, {distf1Elc, hamilElc}, {distfNewElc})
-  pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
+  lbStatusElc, lbDtSuggestedElc = calcLenardBernsteinElc(tCurr, myDt, distf1Elc, distfNewElc)
 
-  if (pbStatusElc == false) or (pbStatusIon == false) then
-    return false, math.min(pbDtSuggestedElc, pbDtSuggestedIon)
+  pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
+  lbStatusIon, lbDtSuggestedIon = calcLenardBernsteinIon(tCurr, myDt, distf1Ion, distfNewIon)
+
+  statusElc = (pbStatusElc and lbStatusElc)
+  statusIon = (pbStatusIon and lbStatusIon)
+  dtSuggestedElc = math.min(pbDtSuggestedElc, lbDtSuggestedElc)
+  dtSuggestedIon = math.min(pbDtSuggestedIon, lbDtSuggestedIon)
+
+  if (statusElc == false) or (statusIon == false) then
+    return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
   distfNewElc:accumulate(myDt, particleSourceElc)
@@ -1078,7 +1187,7 @@ function rk3(tCurr, myDt)
   calcHamiltonianElc(tCurr, myDt, phi1dDg, hamilElc)
   calcHamiltonianIon(tCurr, myDt, phi1dDg, hamilIon)
 
-  return true, math.min(pbDtSuggestedElc, pbDtSuggestedIon)
+  return true, math.min(dtSuggestedElc, dtSuggestedIon)
 end
 
 -- function to advance solution from tStart to tEnd
@@ -1139,6 +1248,11 @@ function writeFields(frameNum, tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
+
+   storedElcEnergy:write( string.format("storedElcEnergy_%d.h5", frameNum), tCurr)
+   storedIonEnergy:write( string.format("storedIonEnergy_%d.h5", frameNum), tCurr)
+   momentsAtEdgesElc:write( string.format("momentsAtEdgesElc_%d.h5", frameNum), tCurr)
+   momentsAtEdgesIon:write( string.format("momentsAtEdgesIon_%d.h5", frameNum), tCurr)
 end
 
 if Lucee.IsRestarting then

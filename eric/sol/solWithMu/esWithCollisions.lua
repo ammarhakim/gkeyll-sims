@@ -8,8 +8,13 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 350e-6
-nFrames = 5
+tEnd = 2000e-6
+nFrames = 20
+-- parameters to control time-stepping
+dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
+tFrame = (tEnd-tStart)/nFrames
+tCurr = tStart
+startFrame = 1
 
 -- physical constants
 -- eletron mass (kg)
@@ -542,7 +547,7 @@ postELM = false
 pbElcEqn = PoissonBracketEquation.SOL3D {
   speciesMass = elcMass,
 }
-pbSlvrElc = Updater.PoissonBracketSimple3D {
+pbSlvrElc = Updater.PoissonBracketSimpleOld3D {
   onGrid = gridElc,
   basis = basisElc,
   cfl = cfl,
@@ -556,7 +561,7 @@ pbSlvrElc = Updater.PoissonBracketSimple3D {
 pbIonEqn = PoissonBracketEquation.SOL3D {
   speciesMass = ionMass,
 }
-pbSlvrIon = Updater.PoissonBracketSimple3D {
+pbSlvrIon = Updater.PoissonBracketSimpleOld3D {
   onGrid = gridIon,
   basis = basisIon,
   cfl = cfl,
@@ -1170,20 +1175,29 @@ copyCToD1d = Updater.CopyContToDisCont1D {
 function writeFields(frameNum, tCurr)
    numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
    numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
-   --distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
-   --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
+   distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
+   distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
    phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
 end
-calcMoments(0.0, 0.0, distfElc, distfIon)
+
+if Lucee.IsRestarting then
+  distfElc:read("distfElc_" .. Lucee.RestartFrame .. ".h5")
+  distfIon:read("distfIon_" .. Lucee.RestartFrame .. ".h5")
+
+  startFrame = Lucee.RestartFrame + 1
+  tCurr = tStart + tFrame*Lucee.RestartFrame
+end
+
+calcMoments(tCurr, 0.0, distfElc, distfIon)
 -- Scale initial ion distribution function so total number of ions = total number of electrons
 distfIon:scale(integratedNumDensityElc:lastInsertedData()/integratedNumDensityIon:lastInsertedData())
-calcMoments(0.0, 0.0, distfElc, distfIon)
+calcMoments(tCurr, 0.0, distfElc, distfIon)
 -- apply boundary conditions to both fields
 runUpdater(momentsAtEdgesIonCalc, 0.0, 0.0, {distfIon}, {momentsAtEdgesIonRK1})
-applyBc(0.0, 0.0, distfElc, distfIon, momentsAtEdgesIonRK1, cutoffVelocities)
+applyBc(tCurr, 0.0, distfElc, distfIon, momentsAtEdgesIonRK1, cutoffVelocities)
 
 -- calculate initial phi
 runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
@@ -1193,21 +1207,18 @@ runUpdater(copyCToD1d, 0.0, 0.0, {phi1d}, {phi1dDg})
 calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
 calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
 -- compute initial diagnostics
-calcDiagnostics(0.0, 0.0)
+calcDiagnostics(tCurr, 0.0)
 -- write out initial conditions
-writeFields(0, 0.0)
--- make a duplicate in case we need it
+if not Lucee.IsRestarting then
+  writeFields(startFrame-1, tCurr)
+end
+  -- make a duplicate in case we need it
 distfDupElc = distfElc:duplicate()
 distfDupIon = distfIon:duplicate()
 hamilDupElc = hamilElc:duplicate()
 hamilDupIon = hamilIon:duplicate()
 
--- parameters to control time-stepping
-dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-tFrame = (tEnd-tStart)/nFrames
-tCurr = tStart
-
-for frame = 1, nFrames do
+for frame = startFrame, nFrames do
    Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
    dtSuggested = advanceFrame(tCurr, tCurr+tFrame, dtSuggested)
    writeFields(frame, tCurr+tFrame)

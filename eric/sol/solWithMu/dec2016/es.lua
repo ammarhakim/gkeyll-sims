@@ -814,10 +814,10 @@ integratedNumDensityElc = DataStruct.DynVector { numComponents = 1, }
 integratedNumDensityIon = DataStruct.DynVector { numComponents = 1, }
 
 -- updater to move a 1d discontinuous field to a 1d continuous field
---contFromDisContCalc = Updater.ContFromDisCont1D {
---   onGrid = grid_1d,
---   basis = basis_1d,
---}
+contFromDisContCalc = Updater.ContFromDisCont1D {
+   onGrid = grid_1d,
+   basis = basis_1d,
+}
 
 -- compute hamiltonian for electrons
 function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
@@ -833,36 +833,29 @@ function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
 end
 
 -- to compute second order hamiltonian term
---mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
---  onGrid = grid_1d,
---  basis = basis_1d,
---}
+mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
+  onGrid = grid_1d,
+  basis = basis_1d,
+}
 -- store result of mhdHamiltonianCalc
---mhdHamiltonian1dDg = DataStruct.Field1D {
---   onGrid = grid_1d,
---   numComponents = basis_1d:numNodes(),
---   ghost = {1, 1},
---}
+mhdHamiltonian1dDg = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numNodes(),
+   ghost = {1, 1},
+}
 -- result of mhdHamiltonianCalc as continuous field
---mhdHamiltonian1d = DataStruct.Field1D {
---   onGrid = grid_1d,
---   numComponents = basis_1d:numExclusiveNodes(),
---   ghost = {1, 1},
---}
---mhdHamiltonian2d = DataStruct.Field3D {
---   onGrid = gridIon,
---   numComponents = basisIon:numExclusiveNodes(),
---   ghost = {1, 1},
---}
---mhdHamiltonian2dDg = DataStruct.Field2D {
---   onGrid = gridIon,
---   numComponents = basisIon:numNodes(),
---   ghost = {1, 1},
---}
--- stores mhd hamiltonian contribution to total energy
---mhdHamiltonianEnergy = DataStruct.DynVector { numComponents = 1, }
+mhdHamiltonian1d = DataStruct.Field1D {
+   onGrid = grid_1d,
+   numComponents = basis_1d:numExclusiveNodes(),
+   ghost = {1, 1},
+}
+mhdHamiltonian3dDg = DataStruct.Field3D {
+   onGrid = gridIon,
+   numComponents = basisIon:numNodes(),
+   ghost = {1, 1},
+}
 
--- compute hamiltonian for electrons
+-- compute hamiltonian for ions
 function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
    -- clear out fields (is this needed?)
    hamilOut:clear(0.0)
@@ -875,12 +868,15 @@ function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
    hamilOut:accumulate(1.0, hamilIonKeDg)
 
    -- compute second order hamiltonian term
-   --runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
-   --runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
-   --runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
-   --runUpdater(copyTo2DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian2d})
-   --mhdHamiltonian2d:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
-   --hamilOut:accumulate(1.0, mhdHamiltonian2d)
+   runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
+   runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
+   -- make mhd hamiltonian continuous
+   runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
+   -- copy back to dg field
+   runUpdater(copyCToD1d, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian1dDg})
+   runUpdater(copyTo3DIonDg, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian3dDg})
+   mhdHamiltonian3dDg:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
+   hamilOut:accumulate(1.0, mhdHamiltonian3dDg)
 end
 
 -- Outflow BCs
@@ -957,7 +953,21 @@ wallElcTempCalc = Updater.SOL3DElectronTempAtWallCalc {
   B0 = B0,
 }
 
--- compute various diagnostics
+-- Output dynvector for computing stored energy
+storedElcEnergy = DataStruct.DynVector { numComponents = 1, }
+storedIonEnergy = DataStruct.DynVector { numComponents = 1, }
+storedEnergyElcCalc = Updater.SOLTotalIntegralCalc3D {
+  onGrid = gridElc,
+  basis = basisElc,
+  scaleFactor = 2*math.pi*B0/elcMass,
+}
+storedEnergyIonCalc = Updater.SOLTotalIntegralCalc3D {
+  onGrid = gridIon,
+  basis = basisIon,
+  scaleFactor = 2*math.pi*B0/ionMass,
+}
+
+-- compute various diagnostics at end of each timestep
 function calcDiagnostics(curr, dt)
   -- compute moments at edges
   runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc}, {momentsAtEdgesElc})
@@ -976,6 +986,9 @@ function calcDiagnostics(curr, dt)
   -- compute heat flux at edges
   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
   momentsAtEdgesIon, tElc, tIon, wallElcTemp}, {heatFluxAtEdge, sheathCoefficients})
+  -- compute stored energy of each species
+  runUpdater(storedEnergyElcCalc, curr, dt, {distfElc, hamilElc}, {storedElcEnergy})
+  runUpdater(storedEnergyIonCalc, curr, dt, {distfIon, hamilIon}, {storedIonEnergy})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
@@ -1139,6 +1152,11 @@ function writeFields(frameNum, tCurr)
    heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
    cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
    sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
+
+   storedElcEnergy:write( string.format("storedElcEnergy_%d.h5", frameNum), tCurr)
+   storedIonEnergy:write( string.format("storedIonEnergy_%d.h5", frameNum), tCurr)
+   momentsAtEdgesElc:write( string.format("momentsAtEdgesElc_%d.h5", frameNum), tCurr)
+   momentsAtEdgesIon:write( string.format("momentsAtEdgesIon_%d.h5", frameNum), tCurr)
 end
 
 if Lucee.IsRestarting then

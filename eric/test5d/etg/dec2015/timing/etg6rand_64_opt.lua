@@ -1,9 +1,9 @@
 -- Input file for ETG test problem in 3x2v slab
 -- Uses gyrokinetic poisson equation
 -- Species are referred to as the 'kinetic' or 'adiabatic' species
--- 11-5-15: Random initial conditions, R/L_T = 6
--- 1-20-15: Now with timing data
--- mpiexec -n 4 /Users/eshi/Research/gkeyllall/par-opt/gkeyll/gkeyll -i etg6rand_64.lua -pc_type lu -pc_factor_mat_solver_package superlu_dist
+-- 11-5-15:  R/L_T = 6
+-- 1-20-16: Now with timing data
+-- mpiexec -n 4 /Users/eshi/Research/gkeyllall/par-opt/gkeyll/gkeyll -i etg6rand_64_opt.lua -pc_type lu -pc_factor_mat_solver_package superlu_dist
 
 -- phase-space decomposition
 phaseDecomp = DecompRegionCalc5D.CartProd { cuts = {1, 1, 1, 1, 1} }
@@ -329,7 +329,7 @@ gyroEqn = PoissonBracketEquation.GyroEquation5D {
   bStarY = bStarYField,
   bStarZ = bStarZField,
 }
-pbSlvr = Updater.PoissonBracketImp5D {
+pbSlvr = Updater.PoissonBracketOpt5D {
    onGrid = grid_5d,
    -- basis functions to use
    basis = basis_5d,
