@@ -581,7 +581,7 @@ aTimesPIon = DataStruct.Field2D {
 }
 
 -- Updater to compute A(x)*A(x) on same basis functions as A(x) (DG field)
-aSquaredCalc = Updater.ASquaredProjectionUpdater {
+aSquaredCalc = Updater.ASquaredProjection1D {
   onGrid = grid_1d,
   basis = basis_1d,
 }
@@ -727,7 +727,7 @@ function rk3(tCurr, myDt)
    -- Copy continuous field back to discontinuous field
    calcDiscontinuousField(tCurr, myDt, aParallel1d, aParallel1dDg)
    -- Compute projection of A(x)^2
-   runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg}, {aSquared1dDg})
+   runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg,aParallel1dDg}, {aSquared1dDg})
    calcContinuous1dField(tCurr, myDt, aSquared1dDg, aSquared1d)
    -- Compute Hamiltonian
    calcHamiltonianElc(tCurr, myDt, phi1d, aParallel1d, aSquared1d, hamilKeElc, hamilElc)
@@ -754,7 +754,7 @@ function rk3(tCurr, myDt)
    -- Copy continuous field back to discontinuous field
    calcDiscontinuousField(tCurr, myDt, aParallel1d, aParallel1dDg)
    -- Compute projection of A(x)^2
-   runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg}, {aSquared1dDg})
+   runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg,aParallel1dDg}, {aSquared1dDg})
    calcContinuous1dField(tCurr, myDt, aSquared1dDg, aSquared1d)
    -- Compute Hamiltonian
    calcHamiltonianElc(tCurr, myDt, phi1d, aParallel1d, aSquared1d, hamilKeElc, hamilElc)
@@ -781,7 +781,7 @@ function rk3(tCurr, myDt)
    -- Copy continuous field back to discontinuous field
    calcDiscontinuousField(tCurr, myDt, aParallel1d, aParallel1dDg)
    -- Compute projection of A(x)^2
-   runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg}, {aSquared1dDg})
+   runUpdater(aSquaredCalc, tCurr, myDt, {aParallel1dDg,aParallel1dDg}, {aSquared1dDg})
    calcContinuous1dField(tCurr, myDt, aSquared1dDg, aSquared1d)
    -- Compute Hamiltonian
    calcHamiltonianElc(tCurr, myDt, phi1d, aParallel1d, aSquared1d, hamilKeElc, hamilElc)
@@ -876,8 +876,9 @@ calcContinuous1dField(0.0, 0.0, aParallel1dDg, aParallel1d)
 -- Copy continuous field back to discontinuous field
 calcDiscontinuousField(0.0, 0.0, aParallel1d, aParallel1dDg)
 -- Compute projection of A(x)^2
-runUpdater(aSquaredCalc, 0.0, 0.0, {aParallel1dDg}, {aSquared1dDg})
+runUpdater(aSquaredCalc, 0.0, 0.0, {aParallel1dDg,aParallel1dDg}, {aSquared1dDg})
 calcContinuous1dField(0.0, 0.0, aSquared1dDg, aSquared1d)
+
 
 -- calculate initial hamiltonian
 calcHamiltonianElc(0.0, 0.0, phi1d, aParallel1d, aSquared1d, hamilKeElc, hamilElc)
