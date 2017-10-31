@@ -740,7 +740,7 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdges3DUpdater {
 }
 
 -- dynvector for heat flux at edge
-heatFluxAtEdge = DataStruct.DynVector { numComponents = 3, }
+heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
 -- dynvector for sheath power transmission coefficients
 sheathCoefficients = DataStruct.DynVector { numComponents = 5, }
 
@@ -855,6 +855,10 @@ mhdHamiltonian3dDg = DataStruct.Field3D {
    numComponents = basisIon:numNodes(),
    ghost = {1, 1},
 }
+productProjectionCalc = Updater.ASquaredProjection1D {
+  onGrid = grid_1d,
+  basis = basis_1d,
+}
 
 -- compute hamiltonian for electrons
 function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
@@ -869,14 +873,18 @@ function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
    hamilOut:accumulate(1.0, hamilIonKeDg)
 
    -- compute second order hamiltonian term
+   -- First compute projection of dPhi^2
    runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
-   runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
+   runUpdater(productProjectionCalc, curr, dt, {phi1dDg,phi1dDg}, {mhdHamiltonian1dDg})
    -- make mhd hamiltonian continuous
    runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
    -- copy back to dg field
    runUpdater(copyCToD1d, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian1dDg})
+   -- scale so it has the right units
+   mhdHamiltonian1dDg:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
+   -- copy to same basis as hamiltonian
    runUpdater(copyTo3DIonDg, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian3dDg})
-   mhdHamiltonian3dDg:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
+   -- add second order hamiltonian
    hamilOut:accumulate(1.0, mhdHamiltonian3dDg)
 end
 
@@ -957,6 +965,8 @@ wallElcTempCalc = Updater.SOL3DElectronTempAtWallCalc {
 -- Output dynvector for computing stored energy
 storedElcEnergy = DataStruct.DynVector { numComponents = 1, }
 storedIonEnergy = DataStruct.DynVector { numComponents = 1, }
+storedElcSourceEnergy = DataStruct.DynVector { numComponents = 1, }
+storedIonSourceEnergy = DataStruct.DynVector { numComponents = 1, }
 storedEnergyElcCalc = Updater.SOLTotalIntegralCalc3D {
   onGrid = gridElc,
   basis = basisElc,
@@ -967,16 +977,36 @@ storedEnergyIonCalc = Updater.SOLTotalIntegralCalc3D {
   basis = basisIon,
   scaleFactor = 2*math.pi*B0/ionMass,
 }
+-- diagnostic to record value of solution in a cell vs. time
+recordFieldInCellRightEdge = Updater.RecordFieldInCell1D {
+  onGrid = grid_1d,
+  cellIndex = {N_Z-1},
+}
+recordFieldInCellLeftEdge = Updater.RecordFieldInCell1D {
+  onGrid = grid_1d,
+  cellIndex = {0},
+}
+H2InCellRightEdge = DataStruct.DynVector { numComponents = basis_1d:numNodes(), }
+H2InCellLeftEdge = DataStruct.DynVector { numComponents = basis_1d:numNodes(), }
 
 -- compute various diagnostics
 function calcDiagnostics(curr, dt)
-  -- compute moments at edges
-  runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc}, {momentsAtEdgesElc})
-  runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon}, {momentsAtEdgesIon})
+  -- record MHD hamiltonian
+  runUpdater(recordFieldInCellRightEdge, curr, dt, {mhdHamiltonian1dDg}, {H2InCellRightEdge})
+  runUpdater(recordFieldInCellLeftEdge, curr, dt, {mhdHamiltonian1dDg}, {H2InCellLeftEdge})
+  -- compute stored energy of each species
+  runUpdater(storedEnergyElcCalc, curr, dt, {distfElc, hamilElc}, {storedElcEnergy})
+  runUpdater(storedEnergyIonCalc, curr, dt, {distfIon, hamilIon}, {storedIonEnergy})
+  -- compute stored energy of source term
+  runUpdater(storedEnergyElcCalc, curr, dt, {particleSourceElc, hamilElc}, {storedElcSourceEnergy})
+  runUpdater(storedEnergyIonCalc, curr, dt, {particleSourceIon, hamilIon}, {storedIonSourceEnergy})
   -- modify phi so that is is equal to phi_s at edge
   -- TODO: change it so it takes phi1dDg as input instead of phi1d
   runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
   runUpdater(copyCToD1d, curr, dt, {phi1dAfterBc}, {phi1dDg})
+  -- compute moments at edges
+  runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc}, {momentsAtEdgesElc})
+  runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon}, {momentsAtEdgesIon})
   -- compute temperature for both species in eV
   tElc:copy(vThermSqElc)
   tElc:scale(elcMass/eV)
@@ -987,9 +1017,6 @@ function calcDiagnostics(curr, dt)
   -- compute heat flux at edges
   runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
   momentsAtEdgesIon, tElc, tIon, wallElcTemp}, {heatFluxAtEdge, sheathCoefficients})
-  -- compute stored energy of each species
-  runUpdater(storedEnergyElcCalc, curr, dt, {distfElc, hamilElc}, {storedElcEnergy})
-  runUpdater(storedEnergyIonCalc, curr, dt, {distfIon, hamilIon}, {storedIonEnergy})
 end
 
 -- calculate average energy in each cell
@@ -1253,6 +1280,10 @@ function writeFields(frameNum, tCurr)
    storedIonEnergy:write( string.format("storedIonEnergy_%d.h5", frameNum), tCurr)
    momentsAtEdgesElc:write( string.format("momentsAtEdgesElc_%d.h5", frameNum), tCurr)
    momentsAtEdgesIon:write( string.format("momentsAtEdgesIon_%d.h5", frameNum), tCurr)
+   storedElcSourceEnergy:write( string.format("storedElcSourceEnergy_%d.h5", frameNum), tCurr)
+   storedIonSourceEnergy:write( string.format("storedIonSourceEnergy_%d.h5", frameNum), tCurr)
+   H2InCellRightEdge:write( string.format("H2InCellRightEdge_%d.h5", frameNum), tCurr)
+   H2InCellLeftEdge:write( string.format("H2InCellLeftEdge_%d.h5", frameNum), tCurr)
 end
 
 if Lucee.IsRestarting then

@@ -1,4 +1,8 @@
 -- Input file for SOL problem with kinetic ions and electrons (1d2v) with lb collisions
+-- 6-24-2015: starting from sol/solWithMu/esWithCollisions.lua, convert to do recycling problem
+-- 7-6-2015: from 0-3000 microseconds
+-- 7-6-2015: recycling coefficient = 0.0 again, alternative to 0.lua
+-- 7-9-2015: testing new reflection boundary condition
 
 -- polynomial order
 polyOrder = 2
@@ -8,13 +12,8 @@ cfl = 0.1
 
 -- parameters to control time-stepping
 tStart = 0.0
-tEnd = 2000e-6
-nFrames = 20
--- parameters to control time-stepping
-dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
-tFrame = (tEnd-tStart)/nFrames
-tCurr = tStart
-startFrame = 1
+tEnd = 1000e-6
+nFrames = 1
 
 -- physical constants
 -- eletron mass (kg)
@@ -34,20 +33,24 @@ eps0 = Lucee.Epsilon0
 kPerpTimesRho = 0.2
 -- pedestal density (1/m^3)
 nPed = 5e19
--- pedestal (source) temperature (eV)
-tPed = 1500
 -- Fixed value of Te that must be independent of time (eV)
 Te0 = 75
--- ELM pulse duration (seconds)
-tELM = 200e-6
+-- pedestal (source) temperature (eV)
+tPed = 1500
 -- Parallel length (m)
 lParallel = 40
--- Source length (m)
+-- Source length (m), also distance from wall
 lSource = 25
--- Particle source proportionality factor
-A = 1.2
+-- Recycling decay length scale (m)
+lRecycling = 4
+-- Source temperature (eV)
+tempSource = 150
 -- Magnetic field (Tesla)
 B0 = 2
+-- Recycling fraction
+recyclingFraction = 0
+-- Particle source proportionality factor
+A = 1.2
 
 -- Derived parameters
 -- Ion cyclotron frequency
@@ -64,9 +67,9 @@ vtIon = math.sqrt(tPed*eV/ionMass)
 -- Pedestal sound speed (m/s)
 cPed = math.sqrt(2*tPed*eV/ionMass)
 -- Particle source
-Sn   = A*nPed*cPed/lSource
+Sn   = A*nPed*cPed/lSource/100
 -- number of cells
-N_Z, N_VPARA, N_MU = 8, 16, 8
+N_Z, N_VPARA, N_MU = 12, 16, 8
 -- domain extents
 Z_LOWER, Z_UPPER = -lParallel, lParallel
 -- electron velocity extents
@@ -275,28 +278,25 @@ mom1MuCalcIon = Updater.DistFuncMomentCalc1DFrom3D {
 }
 
 function maxwellian(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/mass)
-  return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
-    math.exp(-mu*B0/(tPed*eV))
+  return 1/(2*Lucee.Pi*vt^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
+    math.exp(-mu*B0/(mass*vt^2))
 end
 
 -- Maxwellian (Right half only)
-function maxwellianRight(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/mass)
+function maxwellianRight(mass, vtPara, vtPerp, vPara, mu)
   if vPara >=0 then
-    return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
-      math.exp(-mu*B0/(tPed*eV))
+    return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vtPara^2))*math.exp(-vPara^2/(2*vtPara^2))*
+      math.exp(-mu*B0/(mass*vtPerp^2))
   else
     return 0
   end
 end
 
 -- Maxwellian (Left half only)
-function maxwellianLeft(mass, vt, vPara, mu)
-  local vtPerp = math.sqrt(tPed*eV/mass)
+function maxwellianLeft(mass, vtPara, vtPerp, vPara, mu)
   if vPara <= 0 then
-    return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vt^2))*math.exp(-vPara^2/(2*vt^2))*
-      math.exp(-mu*B0/(tPed*eV))
+    return 1/(2*Lucee.Pi*vtPerp^2*math.sqrt(2*Lucee.Pi*vtPara^2))*math.exp(-vPara^2/(2*vtPara^2))*
+      math.exp(-mu*B0/(mass*vtPerp^2))
   else
     return 0
   end
@@ -304,7 +304,7 @@ end
 
 -- Return initial Te(x) in eV
 function initialElectronTemp(x)
-  return Te0
+  return tPed --Te0
 end
 
 -- Return initial ne(x) in 1/m^3
@@ -323,7 +323,7 @@ function initialIonTemp(x)
   if math.abs(x) < lSource/2 then
        backgroundTemp = backgroundTemp + 30*math.cos(math.pi*x/lSource)
      end
-  return backgroundTemp
+  return tPed --backgroundTemp
 end
 
 -- updater to initialize distribution function
@@ -354,16 +354,19 @@ initDistfIon = Updater.ProjectOnNodalBasis3D {
    evaluate = function(z,vPara,mu,t)
      local backgroundTemp = initialIonTemp(z)
      local nHat = 2
-     local vTi = math.sqrt(2*math.pi/(math.pi-1)*backgroundTemp*eV/ionMass)
+     local vTiPara = math.sqrt(math.pi/(math.pi-2)*backgroundTemp*eV/ionMass)
+     local vTiPerp = math.sqrt(backgroundTemp*eV/ionMass)
+
+     --return maxwellian(ionMass, math.sqrt(backgroundTemp*eV/ionMass), vPara, mu)
 
      if z > lSource/2 then
-       return nHat*maxwellianRight(ionMass, vTi, vPara, mu)
+       return nHat*maxwellianRight(ionMass, vTiPara, vTiPerp, vPara, mu)
      elseif z < -lSource/2 then
-       return nHat*maxwellianLeft(ionMass, vTi, vPara, mu)
+       return nHat*maxwellianLeft(ionMass, vTiPara, vTiPerp, vPara, mu)
      else
        -- Must be between the source boundaries, use a linear combo.
-       return ((lSource/2 + z)*nHat*maxwellianRight(ionMass, vTi, vPara, mu) + 
-          (lSource/2 - z)*nHat*maxwellianLeft(ionMass, vTi, vPara, mu))/lSource
+       return ((lSource/2 + z)*nHat*maxwellianRight(ionMass, vTiPerp, vTiPerp, vPara, mu) + 
+          (lSource/2 - z)*nHat*maxwellianLeft(ionMass, vTiPerp, vTiPerp, vPara, mu))/lSource
      end
 	 end
 }
@@ -431,156 +434,6 @@ distfCollisionsIon = DataStruct.Field3D {
    onGrid = gridIon,
    numComponents = basisIon:numNodes(),
    ghost = {1, 1},
-}
-
--- Electron Hamiltonian
-hamilElc = DataStruct.Field3D {
-   onGrid = gridElc,
-   numComponents = basisElc:numNodes(),
-   ghost = {1, 1},
-}
--- Ion Hamiltonian
-hamilIon = DataStruct.Field3D {
-   onGrid = gridIon,
-   numComponents = basisIon:numNodes(),
-   ghost = {1, 1},
-}
-
--- Fields to store the kinetic energy part of the ion and electron hamiltonians
-hamilElcKeDg = DataStruct.Field3D {
-   onGrid = gridElc,
-   numComponents = basisElc:numNodes(),
-   ghost = {1, 1},
-}
-hamilIonKeDg = DataStruct.Field3D {
-   onGrid = gridIon,
-   numComponents = basisIon:numNodes(),
-   ghost = {1, 1},
-}
--- Fields to store the v-para derivative of the kinetic energy hamiltonians
-hamilElcKeDerivDg = DataStruct.Field3D {
-   onGrid = gridElc,
-   numComponents = basisElc:numNodes(),
-   ghost = {1, 1},
-}
-hamilIonKeDerivDg = DataStruct.Field3D {
-   onGrid = gridIon,
-   numComponents = basisIon:numNodes(),
-   ghost = {1, 1},
-}
-
--- updater to initialize electron kinetic energy term in Hamiltonian
-initHamilElcKe = Updater.EvalOnNodes3D {
-   onGrid = gridElc,
-   basis = basisElc,
-   shareCommonNodes = false,
-   evaluate = function (z,vPara,mu,t)
-      return elcMass*vPara^2/2 + mu*B0
-   end
-}
-runUpdater(initHamilElcKe, 0.0, 0.0, {}, {hamilElcKeDg})
-
--- updater to initialize ion kinetic energy term in Hamiltonian
-initHamilIonKe = Updater.EvalOnNodes3D {
-   onGrid = gridIon,
-   basis = basisIon,
-   shareCommonNodes = false,
-   evaluate = function (z,vPara,mu,t)
-      return ionMass*vPara^2/2 + mu*B0
-   end
-}
-runUpdater(initHamilIonKe, 0.0, 0.0, {}, {hamilIonKeDg})
-
--- particle source (ELECTRONS)
-particleSourceElc = DataStruct.Field3D {
-   onGrid = gridElc,
-   numComponents = basisElc:numNodes(),
-   ghost = {1, 1},
-}
--- clear out contents
-particleSourceElc:clear(0.0)
--- updater to fill out particle source
-particleSourceUpdaterElc = Updater.ProjectOnNodalBasis3D {
-   onGrid = gridElc,
-   -- basis functions to use
-   basis = basisElc,
-   -- are common nodes shared?
-   shareCommonNodes = false, -- In DG, common nodes are not shared
-   -- function to use for initialization
-   evaluate = function(z,vPara,mu,t)
-    if math.abs(z) < lSource/2 then
-      if t < tELM then
-        return Sn*math.cos(math.pi*z/lSource)*maxwellian(elcMass, math.sqrt(tPed*eV/elcMass), vPara, mu)
-      else
-        return Sn/9*math.cos(math.pi*z/lSource)*maxwellian(elcMass, math.sqrt(210*eV/elcMass), vPara, mu)
-      end
-    else
-      return 0
-    end
-	 end
-}
-runUpdater(particleSourceUpdaterElc, 0.0, 0.0, {}, {particleSourceElc})
-
--- particle source (IONS)
-particleSourceIon = DataStruct.Field3D {
-   onGrid = gridIon,
-   numComponents = basisIon:numNodes(),
-   ghost = {1, 1},
-}
--- clear out contents
-particleSourceIon:clear(0.0)
--- updater to fill out particle source
-particleSourceUpdaterIon = Updater.ProjectOnNodalBasis3D {
-   onGrid = gridIon,
-   -- basis functions to use
-   basis = basisIon,
-   -- are common nodes shared?
-   shareCommonNodes = false, -- In DG, common nodes are not shared
-   -- function to use for initialization
-   evaluate = function(z,vPara,mu,t)
-    if math.abs(z) < lSource/2 then
-      if t < tELM then
-        return Sn*math.cos(math.pi*z/lSource)*maxwellian(ionMass, math.sqrt(tPed*eV/ionMass), vPara, mu)
-      else
-        return Sn/9*math.cos(math.pi*z/lSource)*maxwellian(ionMass, math.sqrt(260*eV/ionMass), vPara, mu)
-      end
-    else
-      return 0
-    end
-	 end
-}
-runUpdater(particleSourceUpdaterIon, 0.0, 0.0, {}, {particleSourceIon})
-
--- keeps track of whether to update particlesources again
-postELM = false
-
--- define electron equation to solve
-pbElcEqn = PoissonBracketEquation.SOL3D {
-  speciesMass = elcMass,
-}
-pbSlvrElc = Updater.PoissonBracketSimple3D {
-  onGrid = gridElc,
-  basis = basisElc,
-  cfl = cfl,
-  equation = pbElcEqn,
-  updateDirections = {0,1},
-  zeroFluxDirections = {1,2},
-  onlyIncrement = false,
-  fluxType = "upwind",
-}
--- define ion equation to solve
-pbIonEqn = PoissonBracketEquation.SOL3D {
-  speciesMass = ionMass,
-}
-pbSlvrIon = Updater.PoissonBracketSimple3D {
-  onGrid = gridIon,
-  basis = basisIon,
-  cfl = cfl,
-  equation = pbIonEqn,
-  updateDirections = {0,1},
-  zeroFluxDirections = {1,2},
-  onlyIncrement = false,
-  fluxType = "upwind",
 }
 
 -- functions to return collision frequencies
@@ -683,6 +536,9 @@ function calcMoments(curr, dt, distfElcIn, distfIonIn)
     {driftUElc, vThermSqElc})
   runUpdater(vFromMomentsCalcIon, curr, dt, {numDensityIon, mom1ParaIon, mom1MuIon, mom2ParaIon},
     {driftUIon, vThermSqIon})
+
+  --driftUElc:clear(0.0)
+  --driftUIon:clear(0.0)
   -- copy vThermSq fields to 3d
   runUpdater(copyTo3DElcDg, curr, dt, {vThermSqElc}, {vThermSq3dElc})
   runUpdater(copyTo3DIonDg, curr, dt, {vThermSqIon}, {vThermSq3dIon})
@@ -693,41 +549,6 @@ function calcMoments(curr, dt, distfElcIn, distfIonIn)
   runUpdater(integrateSpatialField, curr, dt, {numDensityElc}, {integratedNumDensityElc})
   runUpdater(integrateSpatialField, curr, dt, {numDensityIon}, {integratedNumDensityIon})
 end
-
--- field to store continuous potential in 1D
-phi1d = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numExclusiveNodes(),
-   ghost = {1, 1},
-}
--- continuous potential after it has been modified
-phi1dAfterBc = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numExclusiveNodes(),
-   ghost = {1, 1},
-}
-
-phi1dDg = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numNodes(),
-   ghost = {1, 1},
-}
-
--- updater to compute phi electrostatically
-electrostaticPhiCalc = Updater.ElectrostaticContPhiUpdater {
-   onGrid = grid_1d,
-   basis = basis_1d,
-   kPerpTimesRho = kPerpTimesRho,
-   Te0 = Te0,
-}
-
--- updater to ensure phi at boundary has value of the sheath potential
-setPhiAtBoundaryCalc = Updater.SetPhiAtBoundaryUpdater {
-  onGrid = grid_1d,
-  basis = basis_1d,
-  elcMass = elcMass,
-  elcCharge = eV,
-}
 
 -- Dynvectors to store 0-3rd moments at left and right edges
 momentsAtEdgesElc = DataStruct.DynVector { numComponents = 6, }
@@ -747,24 +568,6 @@ momentsAtEdgesIonCalc = Updater.MomentsAtEdges3DUpdater {
   onGrid = gridIon,
   basis = basisIon,
   scaleFactor = 2*math.pi*B0/ionMass
-}
-
--- dynvector for heat flux at edge
-heatFluxAtEdge = DataStruct.DynVector { numComponents = 6, }
--- dynvector for sheath power transmission coefficients
-sheathCoefficients = DataStruct.DynVector { numComponents = 5, }
-
--- to compute total particle energy
-heatFluxAtEdgeCalc = Updater.KineticHeatFluxAtEdge3DUpdater {
-   -- grid for updater
-   onGrid = grid_1d,
-   -- basis functions to use
-   basis = basis_1d,
-   ionMass = ionMass,
-   electronMass = elcMass,
-   B0 = B0,
-   -- Enable calculation of sheath coefficients
-   computeSheathCoefficient = true,
 }
 
 -- updaters to calculate total temperature
@@ -824,29 +627,14 @@ integratedVThermSqIon = DataStruct.DynVector { numComponents = 1, }
 integratedNumDensityElc = DataStruct.DynVector { numComponents = 1, }
 integratedNumDensityIon = DataStruct.DynVector { numComponents = 1, }
 
+integratedNumDensityElcWrite = DataStruct.DynVector { numComponents = 1, }
+integratedNumDensityIonWrite = DataStruct.DynVector { numComponents = 1, }
+
 -- updater to move a 1d discontinuous field to a 1d continuous field
-contFromDisContCalc = Updater.ContFromDisCont1D {
-   onGrid = grid_1d,
-   basis = basis_1d,
-}
-
--- to compute v-parallel derivative of a 3d field (used for fluxes)
-vParaDerivCalcElc = Updater.SOLDerivativeCalc3D {
-  onGrid = gridElc,
-  basis = basisElc,
-  dir = 1,
-  scaleFactor = 1/elcMass,
-}
-runUpdater(vParaDerivCalcElc, 0.0, 0.0, {hamilElcKeDg}, {hamilElcKeDerivDg})
-
--- to compute v-parallel derivative of a 3d field (used for fluxes)
-vParaDerivCalcIon = Updater.SOLDerivativeCalc3D {
-  onGrid = gridIon,
-  basis = basisIon,
-  dir = 1,
-  scaleFactor = 1/ionMass,
-}
-runUpdater(vParaDerivCalcIon, 0.0, 0.0, {hamilIonKeDg}, {hamilIonKeDerivDg})
+--contFromDisContCalc = Updater.ContFromDisCont1D {
+--   onGrid = grid_1d,
+--   basis = basis_1d,
+--}
 
 -- compute hamiltonian for electrons
 function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
@@ -862,38 +650,41 @@ function calcHamiltonianElc(curr, dt, phiDgIn, hamilOut)
 end
 
 -- to compute second order hamiltonian term
-mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
-  onGrid = grid_1d,
-  basis = basis_1d,
-}
+--mhdHamiltonianCalc = Updater.MHDHamiltonianUpdater {
+--  onGrid = grid_1d,
+--  basis = basis_1d,
+--}
 -- store result of mhdHamiltonianCalc
-mhdHamiltonian1dDg = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numNodes(),
-   ghost = {1, 1},
-}
+--mhdHamiltonian1dDg = DataStruct.Field1D {
+--   onGrid = grid_1d,
+--   numComponents = basis_1d:numNodes(),
+--   ghost = {1, 1},
+--}
 -- result of mhdHamiltonianCalc as continuous field
-mhdHamiltonian1d = DataStruct.Field1D {
-   onGrid = grid_1d,
-   numComponents = basis_1d:numExclusiveNodes(),
-   ghost = {1, 1},
-}
-mhdHamiltonian3dDg = DataStruct.Field3D {
-   onGrid = gridIon,
-   numComponents = basisIon:numNodes(),
-   ghost = {1, 1},
-}
-productProjectionCalc = Updater.ASquaredProjection1D {
-  onGrid = grid_1d,
-  basis = basis_1d,
-}
+--mhdHamiltonian1d = DataStruct.Field1D {
+--   onGrid = grid_1d,
+--   numComponents = basis_1d:numExclusiveNodes(),
+--   ghost = {1, 1},
+--}
+--mhdHamiltonian2d = DataStruct.Field3D {
+--   onGrid = gridIon,
+--   numComponents = basisIon:numExclusiveNodes(),
+--   ghost = {1, 1},
+--}
+--mhdHamiltonian2dDg = DataStruct.Field2D {
+--   onGrid = gridIon,
+--   numComponents = basisIon:numNodes(),
+--   ghost = {1, 1},
+--}
+-- stores mhd hamiltonian contribution to total energy
+--mhdHamiltonianEnergy = DataStruct.DynVector { numComponents = 1, }
 
--- compute hamiltonian for ions
+-- compute hamiltonian for electrons
 function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
    -- clear out fields (is this needed?)
    hamilOut:clear(0.0)
 
-   -- Accumulate q*dPhi contribution to hamiltonian
+   -- Accumulate q*Phi contribution to hamiltonian
    runUpdater(copyTo3DIonDg, curr, dt, {phiDgIn}, {hamilOut})
    hamilOut:scale(ionCharge)
 
@@ -901,19 +692,12 @@ function calcHamiltonianIon(curr, dt, phiDgIn, hamilOut)
    hamilOut:accumulate(1.0, hamilIonKeDg)
 
    -- compute second order hamiltonian term
-   -- First compute projection of dPhi^2
-   runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
-   runUpdater(productProjectionCalc, curr, dt, {phi1dDg,phi1dDg}, {mhdHamiltonian1dDg})
-   -- make mhd hamiltonian continuous
-   runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
-   -- copy back to dg field
-   runUpdater(copyCToD1d, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian1dDg})
-   -- scale so it has the right units
-   mhdHamiltonian1dDg:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
-   -- copy to same basis as hamiltonian
-   runUpdater(copyTo3DIonDg, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian3dDg})
-   -- add second order hamiltonian
-   hamilOut:accumulate(1.0, mhdHamiltonian3dDg)
+   --runUpdater(copyCToD1d, curr, dt, {phiIn}, {phi1dDg})
+   --runUpdater(mhdHamiltonianCalc, curr, dt, {phi1dDg, numDensityIon}, {mhdHamiltonian1dDg})
+   --runUpdater(contFromDisContCalc, curr, dt, {mhdHamiltonian1dDg}, {mhdHamiltonian1d})
+   --runUpdater(copyTo2DIon, curr, dt, {mhdHamiltonian1d}, {mhdHamiltonian2d})
+   --mhdHamiltonian2d:scale(-0.5*kPerpTimesRho*kPerpTimesRho*Lucee.ElementaryCharge/Te0)
+   --hamilOut:accumulate(1.0, mhdHamiltonian2d)
 end
 
 -- Outflow BCs
@@ -968,187 +752,133 @@ reflectingBc = Updater.SOL3DElectrostaticDistFuncReflectionBc {
    basis1d = basis_1d,
    edge = "both",
    scaleFactor = 2*math.pi*B0/elcMass,
-   computeCutoffVelocities = true,
+   computeCutoffVelocities = false,
 }
 
 -- apply boundary conditions
-function applyBc(curr, dt, fldElc, fldIon, momentsAtEdgesIonIn, cutoffV)
-  runUpdater(bcLowerIon, curr, dt, {}, {fldIon})
-  runUpdater(bcUpperIon, curr, dt, {}, {fldIon})
+function applyBc(curr, dt, fldElc, fldIon)
+  fldElc:applyPeriodicBc(0)
+  fldIon:applyPeriodicBc(0)
+  --runUpdater(bcLowerIon, curr, dt, {}, {fldIon})
+  --runUpdater(bcUpperIon, curr, dt, {}, {fldIon})
   -- Use reflecting BC for the electrons
-  runUpdater(reflectingBc, curr, dt, {momentsAtEdgesIonIn}, {fldElc, cutoffV})
+  --runUpdater(reflectingBc, curr, dt, {momentsAtEdgesIon}, {fldElc, cutoffV})
   -- (zero flux bc's applied via poisson updater)
 end
 
--- Output dynvector for computing wall electron temperature
-wallElcTemp = DataStruct.DynVector { numComponents = 1, }
-wallElcTempCalc = Updater.SOL3DElectronTempAtWallCalc {
-  onGrid = gridElc,
-  basis = basisElc,
-  elcMass = elcMass,
-  eV = eV,
-  B0 = B0,
-}
-
--- Output dynvector for computing stored energy
-storedElcEnergy = DataStruct.DynVector { numComponents = 1, }
-storedIonEnergy = DataStruct.DynVector { numComponents = 1, }
-storedElcSourceEnergy = DataStruct.DynVector { numComponents = 1, }
-storedIonSourceEnergy = DataStruct.DynVector { numComponents = 1, }
-
-storedEnergyElcCalc = Updater.SOLTotalIntegralCalc3D {
-  onGrid = gridElc,
-  basis = basisElc,
-  scaleFactor = 2*math.pi*B0/elcMass,
-}
-storedEnergyIonCalc = Updater.SOLTotalIntegralCalc3D {
-  onGrid = gridIon,
-  basis = basisIon,
-  scaleFactor = 2*math.pi*B0/ionMass,
-}
--- diagnostic to record value of solution in a cell vs. time
-recordFieldInCellRightEdge = Updater.RecordFieldInCell1D {
-  onGrid = grid_1d,
-  cellIndex = {N_Z-1},
-}
-recordFieldInCellLeftEdge = Updater.RecordFieldInCell1D {
-  onGrid = grid_1d,
-  cellIndex = {0},
-}
-H2InCellRightEdge = DataStruct.DynVector { numComponents = basis_1d:numNodes(), }
-H2InCellLeftEdge = DataStruct.DynVector { numComponents = basis_1d:numNodes(), }
-
--- compute various diagnostics at end of each timestep
+-- compute various diagnostics
 function calcDiagnostics(curr, dt)
-  -- record MHD hamiltonian
-  runUpdater(recordFieldInCellRightEdge, curr, dt, {mhdHamiltonian1dDg}, {H2InCellRightEdge})
-  runUpdater(recordFieldInCellLeftEdge, curr, dt, {mhdHamiltonian1dDg}, {H2InCellLeftEdge})
-  -- compute stored energy of each species
-  runUpdater(storedEnergyElcCalc, curr, dt, {distfElc, hamilElc}, {storedElcEnergy})
-  runUpdater(storedEnergyIonCalc, curr, dt, {distfIon, hamilIon}, {storedIonEnergy})
-  -- compute stored energy of source term
-  runUpdater(storedEnergyElcCalc, curr, dt, {particleSourceElc, hamilElc}, {storedElcSourceEnergy})
-  runUpdater(storedEnergyIonCalc, curr, dt, {particleSourceIon, hamilIon}, {storedIonSourceEnergy})
   -- modify phi so that is is equal to phi_s at edge
   -- TODO: change it so it takes phi1dDg as input instead of phi1d
-  runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
-  runUpdater(copyCToD1d, curr, dt, {phi1dAfterBc}, {phi1dDg})
-  -- compute moments at edges
-  runUpdater(momentsAtEdgesElcCalc, curr, dt, {distfElc}, {momentsAtEdgesElc})
-  runUpdater(momentsAtEdgesIonCalc, curr, dt, {distfIon}, {momentsAtEdgesIon})
+  --runUpdater(setPhiAtBoundaryCalc, curr, dt, {phi1d, cutoffVelocities}, {phi1dAfterBc})
+  --runUpdater(copyCToD1d, curr, dt, {phi1dAfterBc}, {phi1dDg})
   -- compute temperature for both species in eV
   tElc:copy(vThermSqElc)
   tElc:scale(elcMass/eV)
   tIon:copy(vThermSqIon)
   tIon:scale(ionMass/eV)
-  -- compute electron temperature at wall
-  runUpdater(wallElcTempCalc, curr, dt, {distfElc, cutoffVelocities}, {wallElcTemp})
-  -- compute heat flux at edges
-  runUpdater(heatFluxAtEdgeCalc, curr, dt, {phi1dDg, momentsAtEdgesElc,
-  momentsAtEdgesIon, tElc, tIon, wallElcTemp}, {heatFluxAtEdge, sheathCoefficients})
+
+  runUpdater(integrateSpatialField, curr, dt, {numDensityElc}, {integratedNumDensityElcWrite})
+  runUpdater(integrateSpatialField, curr, dt, {numDensityIon}, {integratedNumDensityIonWrite})
 end
 
 -- function to take a time-step using SSP-RK3 time-stepping scheme
 function rk3(tCurr, myDt)
   local statusElc, dtSuggestedElc
-  local pbStatusElc, pbDtSuggestedElc
   local diffStatusElc, diffDtSuggestedElc
   local dragStatusElc, dragDtSuggestedElc
   local statusIon, dtSuggestedIon
-  local pbStatusIon, pbDtSuggestedIon
   local diffStatusIon, diffDtSuggestedIon
   local dragStatusIon, dragDtSuggestedIon
 
-  if (postELM == false) then
-   if tCurr + myDt > tELM then
-     postELM = true
-     runUpdater(particleSourceUpdaterElc, tCurr, myDt, {}, {particleSourceElc})
-     runUpdater(particleSourceUpdaterIon, tCurr, myDt, {}, {particleSourceIon})
-   end
-  end
-
   -- RK stage 1
-  pbStatusElc, pbDtSuggestedElc = runUpdater(pbSlvrElc, tCurr, myDt, {distfElc, hamilElc}, {distf1Elc})
-  pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distfIon, hamilIon}, {distf1Ion})
-  
-  if (pbStatusElc == false) or (pbStatusIon == false) then
-    return false, math.min(pbDtSuggestedElc, pbDtSuggestedIon)
+  distf1Elc:copy(distfElc)
+  dragStatusElc, dragDtSuggestedElc = runUpdater(dragSlvrElc, tCurr, myDt, {distfElc, driftUElc}, {distfCollisionsElc})
+  distf1Elc:accumulate(myDt, distfCollisionsElc)
+  diffStatusElc, diffDtSuggestedElc = runUpdater(diffSlvrElc, tCurr, myDt, {distfElc, vThermSq3dElc}, {distfCollisionsElc})
+  distf1Elc:accumulate(myDt, distfCollisionsElc)
+
+  distf1Ion:copy(distfIon)
+  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distfIon, driftUIon}, {distfCollisionsIon})
+  distf1Ion:accumulate(myDt, distfCollisionsIon)
+  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distfIon, vThermSq3dIon}, {distfCollisionsIon})
+  distf1Ion:accumulate(myDt, distfCollisionsIon)
+
+  statusElc = dragStatusElc and diffStatusElc
+  statusIon = dragStatusIon and diffStatusIon
+  dtSuggestedElc = math.min(dragDtSuggestedElc, diffDtSuggestedElc)
+  dtSuggestedIon = math.min(dragDtSuggestedIon, diffDtSuggestedIon)
+
+  if (statusElc == false) or (statusIon == false) then
+    return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
 
-  distf1Elc:accumulate(myDt, particleSourceElc)
-  distf1Ion:accumulate(myDt, particleSourceIon)
-
-  calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
-  -- apply boundary conditions to both fields
-  runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distf1Ion}, {momentsAtEdgesIonRK1})
-  applyBc(tCurr, myDt, distf1Elc, distf1Ion, momentsAtEdgesIonRK1, cutoffVelocities1)
-
-  runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon}, {phi1d})
-  -- Copy the continuous phi back onto a dg field
-  runUpdater(copyCToD1d, tCurr, myDt, {phi1d}, {phi1dDg})
-
-  -- Compute Hamiltonian
-  calcHamiltonianElc(tCurr, myDt, phi1dDg, hamilElc)
-  calcHamiltonianIon(tCurr, myDt, phi1dDg, hamilIon)
+  distf1Elc:applyPeriodicBc(0)
+  distf1Ion:applyPeriodicBc(0)
+  calcMoments(0.0, 0.0, distf1Elc, distf1Ion)
 
   -- RK stage 2
-  pbStatusElc, pbDtSuggestedElc = runUpdater(pbSlvrElc, tCurr, myDt, {distf1Elc, hamilElc}, {distfNewElc})
-  pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
+  distfNewElc:copy(distf1Elc)
+  dragStatusElc, dragDtSuggestedElc = runUpdater(dragSlvrElc, tCurr, myDt, {distf1Elc, driftUElc}, {distfCollisionsElc})
+  distfNewElc:accumulate(myDt, distfCollisionsElc)
+  diffStatusElc, diffDtSuggestedElc = runUpdater(diffSlvrElc, tCurr, myDt, {distf1Elc, vThermSq3dElc}, {distfCollisionsElc})
+  distfNewElc:accumulate(myDt, distfCollisionsElc)
 
-  if (pbStatusElc == false) or (pbStatusIon == false) then
-    return false, math.min(pbDtSuggestedElc, pbDtSuggestedIon)
+  distfNewIon:copy(distf1Ion)
+  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distf1Ion, driftUIon}, {distfCollisionsIon})
+  distfNewIon:accumulate(myDt, distfCollisionsIon)
+  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distf1Ion, vThermSq3dIon}, {distfCollisionsIon})
+  distfNewIon:accumulate(myDt, distfCollisionsIon)
+
+  statusElc = dragStatusElc and diffStatusElc
+  statusIon = dragStatusIon and diffStatusIon
+  dtSuggestedElc = math.min(dragDtSuggestedElc, diffDtSuggestedElc)
+  dtSuggestedIon = math.min(dragDtSuggestedIon, diffDtSuggestedIon)
+
+  if (statusElc == false) or (statusIon == false) then
+    return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
-
-  distfNewElc:accumulate(myDt, particleSourceElc)
-  distfNewIon:accumulate(myDt, particleSourceIon)
 
   distf1Elc:combine(3.0/4.0, distfElc, 1.0/4.0, distfNewElc)
   distf1Ion:combine(3.0/4.0, distfIon, 1.0/4.0, distfNewIon)
-
-  calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
-  -- apply boundary conditions to both fields
-  runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distf1Ion}, {momentsAtEdgesIonRK2})
-  applyBc(tCurr, myDt, distf1Elc, distf1Ion, momentsAtEdgesIonRK2, cutoffVelocities2)
-
-  runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon}, {phi1d})
-  -- Copy the continuous phi back onto a dg field
-  runUpdater(copyCToD1d, tCurr, myDt, {phi1d}, {phi1dDg})
-
-  -- Compute Hamiltonian
-  calcHamiltonianElc(tCurr, myDt, phi1dDg, hamilElc)
-  calcHamiltonianIon(tCurr, myDt, phi1dDg, hamilIon)
+  
+  distf1Elc:applyPeriodicBc(0)
+  distf1Ion:applyPeriodicBc(0)
+  calcMoments(0.0, 0.0, distf1Elc, distf1Ion)
 
   -- RK stage 3
-  pbStatusElc, pbDtSuggestedElc = runUpdater(pbSlvrElc, tCurr, myDt, {distf1Elc, hamilElc}, {distfNewElc})
-  pbStatusIon, pbDtSuggestedIon = runUpdater(pbSlvrIon, tCurr, myDt, {distf1Ion, hamilIon}, {distfNewIon})
+  distfNewElc:copy(distf1Elc)
+  dragStatusElc, dragDtSuggestedElc = runUpdater(dragSlvrElc, tCurr, myDt, {distf1Elc, driftUElc}, {distfCollisionsElc})
+  distfNewElc:accumulate(myDt, distfCollisionsElc)
+  diffStatusElc, diffDtSuggestedElc = runUpdater(diffSlvrElc, tCurr, myDt, {distf1Elc, vThermSq3dElc}, {distfCollisionsElc})
+  distfNewElc:accumulate(myDt, distfCollisionsElc)
 
-  if (pbStatusElc == false) or (pbStatusIon == false) then
-    return false, math.min(pbDtSuggestedElc, pbDtSuggestedIon)
+  distfNewIon:copy(distf1Ion)
+  dragStatusIon, dragDtSuggestedIon = runUpdater(dragSlvrIon, tCurr, myDt, {distf1Ion, driftUIon}, {distfCollisionsIon})
+  distfNewIon:accumulate(myDt, distfCollisionsIon)
+  diffStatusIon, diffDtSuggestedIon = runUpdater(diffSlvrIon, tCurr, myDt, {distf1Ion, vThermSq3dIon}, {distfCollisionsIon})
+  distfNewIon:accumulate(myDt, distfCollisionsIon)
+
+  statusElc = dragStatusElc and diffStatusElc
+  statusIon = dragStatusIon and diffStatusIon
+  dtSuggestedElc = math.min(dragDtSuggestedElc, diffDtSuggestedElc)
+  dtSuggestedIon = math.min(dragDtSuggestedIon, diffDtSuggestedIon)
+
+  if (statusElc == false) or (statusIon == false) then
+    return false, math.min(dtSuggestedElc, dtSuggestedIon)
   end
-
-  distfNewElc:accumulate(myDt, particleSourceElc)
-  distfNewIon:accumulate(myDt, particleSourceIon)
 
   distf1Elc:combine(1.0/3.0, distfElc, 2.0/3.0, distfNewElc)
   distf1Ion:combine(1.0/3.0, distfIon, 2.0/3.0, distfNewIon)
+  calcMoments(0.0, 0.0, distf1Elc, distf1Ion)
 
-  calcMoments(tCurr, myDt, distf1Elc, distf1Ion)
-  -- apply boundary conditions to both fields
-  runUpdater(momentsAtEdgesIonCalc, tCurr, myDt, {distf1Ion}, {momentsAtEdgesIonRK3})
-  applyBc(tCurr, myDt, distf1Elc, distf1Ion, momentsAtEdgesIonRK3, cutoffVelocities)
+  distf1Elc:applyPeriodicBc(0)
+  distf1Ion:applyPeriodicBc(0)
 
   distfElc:copy(distf1Elc)
   distfIon:copy(distf1Ion)
 
-  runUpdater(electrostaticPhiCalc, tCurr, myDt, {numDensityElc, numDensityIon}, {phi1d})
-  -- Copy the continuous phi back onto a dg field
-  runUpdater(copyCToD1d, tCurr, myDt, {phi1d}, {phi1dDg})
-
-  -- Compute Hamiltonian
-  calcHamiltonianElc(tCurr, myDt, phi1dDg, hamilElc)
-  calcHamiltonianIon(tCurr, myDt, phi1dDg, hamilIon)
-
-  return true, math.min(pbDtSuggestedElc, pbDtSuggestedIon)
+  return true, math.min(dtSuggestedElc, dtSuggestedIon)
 end
 
 -- function to advance solution from tStart to tEnd
@@ -1161,8 +891,6 @@ function advanceFrame(tStart, tEnd, initDt)
    while tCurr<=tEnd do
       distfDupElc:copy(distfElc)
       distfDupIon:copy(distfIon)
-      hamilDupElc:copy(hamilElc)
-      hamilDupIon:copy(hamilIon)
 
       if (tCurr+myDt > tEnd) then
 	      myDt = tEnd-tCurr
@@ -1175,8 +903,6 @@ function advanceFrame(tStart, tEnd, initDt)
 	      print (string.format("** Time step %g too large! Will retake with dt %g", myDt, dtSuggested))
 	      distfElc:copy(distfDupElc)
 	      distfIon:copy(distfDupIon)
-	      hamilElc:copy(hamilDupElc)
-	      hamilIon:copy(hamilDupIon)
 	      myDt = dtSuggested
       else
         calcDiagnostics(tCurr, myDt)
@@ -1203,57 +929,46 @@ copyCToD1d = Updater.CopyContToDisCont1D {
 function writeFields(frameNum, tCurr)
    numDensityElc:write( string.format("numDensityElc_%d.h5", frameNum), tCurr)
    numDensityIon:write( string.format("numDensityIon_%d.h5", frameNum), tCurr)
-   distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
-   distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
-   phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
-   heatFluxAtEdge:write( string.format("heatFluxAtEdge_%d.h5", frameNum), tCurr)
-   cutoffVelocities:write( string.format("cutoffV_%d.h5", frameNum), tCurr)
-   sheathCoefficients:write( string.format("sheathCoefficients_%d.h5", frameNum) ,tCurr)
-
-   storedElcEnergy:write( string.format("storedElcEnergy_%d.h5", frameNum), tCurr)
-   storedIonEnergy:write( string.format("storedIonEnergy_%d.h5", frameNum), tCurr)
-   storedElcSourceEnergy:write( string.format("storedElcSourceEnergy_%d.h5", frameNum), tCurr)
-   storedIonSourceEnergy:write( string.format("storedIonSourceEnergy_%d.h5", frameNum), tCurr)
-   momentsAtEdgesElc:write( string.format("momentsAtEdgesElc_%d.h5", frameNum), tCurr)
-   momentsAtEdgesIon:write( string.format("momentsAtEdgesIon_%d.h5", frameNum), tCurr)
-   H2InCellRightEdge:write( string.format("H2InCellRightEdge_%d.h5", frameNum), tCurr)
-   H2InCellLeftEdge:write( string.format("H2InCellLeftEdge_%d.h5", frameNum), tCurr)
+   integratedNumDensityElcWrite:write( string.format("nTotalElc_%d.h5", frameNum), tCurr)
+   integratedNumDensityIonWrite:write( string.format("nTotalIon_%d.h5", frameNum), tCurr)
+   --tElc:write( string.format("tElc_%d.h5", frameNum), tCurr)
+   --tIon:write( string.format("tIon_%d.h5", frameNum), tCurr)
+   --distfElc:write( string.format("distfElc_%d.h5", frameNum), tCurr)
+   --distfIon:write( string.format("distfIon_%d.h5", frameNum), tCurr)
+   --mom1ParaElc:write( string.format("mom1ParaElc_%d.h5", frameNum), tCurr)
+   --mom1ParaIon:write( string.format("mom1ParaIon_%d.h5", frameNum), tCurr)
+   --phi1dDg:write( string.format("phi_%d.h5", frameNum), tCurr)
 end
+
+-- parameters to control time-stepping
+dtSuggested = 0.1*tEnd -- initial time-step to use (will be adjusted)
+tFrame = (tEnd-tStart)/nFrames
+tCurr = tStart
+startFrame = 1
 
 if Lucee.IsRestarting then
   distfElc:read("distfElc_" .. Lucee.RestartFrame .. ".h5")
+  distfElc:sync()
   distfIon:read("distfIon_" .. Lucee.RestartFrame .. ".h5")
+  distfIon:sync()
 
   startFrame = Lucee.RestartFrame + 1
   tCurr = tStart + tFrame*Lucee.RestartFrame
+  print(tCurr)
 end
 
-calcMoments(tCurr, 0.0, distfElc, distfIon)
--- Scale initial ion distribution function so total number of ions = total number of electrons
-distfIon:scale(integratedNumDensityElc:lastInsertedData()/integratedNumDensityIon:lastInsertedData())
-calcMoments(tCurr, 0.0, distfElc, distfIon)
--- apply boundary conditions to both fields
-runUpdater(momentsAtEdgesIonCalc, 0.0, 0.0, {distfIon}, {momentsAtEdgesIonRK1})
-applyBc(tCurr, 0.0, distfElc, distfIon, momentsAtEdgesIonRK1, cutoffVelocities)
-
--- calculate initial phi
-runUpdater(electrostaticPhiCalc, 0.0, 0.0, {numDensityElc, numDensityIon}, {phi1d})
--- Copy the continuous phi back onto a dg field
-runUpdater(copyCToD1d, 0.0, 0.0, {phi1d}, {phi1dDg})
--- calculate initial Hamiltonian
-calcHamiltonianElc(0.0, 0.0, phi1dDg, hamilElc)
-calcHamiltonianIon(0.0, 0.0, phi1dDg, hamilIon)
+-- apply boundary conditions
+distfElc:applyPeriodicBc(0)
+distfIon:applyPeriodicBc(0)
+-- calc moments
+calcMoments(0.0, 0.0, distfElc, distfIon)
 -- compute initial diagnostics
-calcDiagnostics(tCurr, 0.0)
+calcDiagnostics(0.0, 0.0)
 -- write out initial conditions
-if not Lucee.IsRestarting then
-  writeFields(startFrame-1, tCurr)
-end
-  -- make a duplicate in case we need it
+writeFields(startFrame-1, tCurr)
+-- make a duplicate in case we need it
 distfDupElc = distfElc:duplicate()
 distfDupIon = distfIon:duplicate()
-hamilDupElc = hamilElc:duplicate()
-hamilDupIon = hamilIon:duplicate()
 
 for frame = startFrame, nFrames do
    Lucee.logInfo (string.format("-- Advancing solution from %g to %g", tCurr, tCurr+tFrame))
