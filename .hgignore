@@ -1,0 +1,5 @@
+syntax: glob
+*.bp
+*.h5
+*.swp
+*.log
