@@ -313,12 +313,14 @@ phiCalc = Updater.ETGAdiabaticPotentialUpdater {
   kzfTimesRhoSquared = 1,
   adiabaticTemp = adiabaticTemp,
   adiabaticCharge = adiabaticCharge,
+  n0 = n0,
 }
 
 -- Updater to smooth out 2d field (phi)
 smoothCalc = Updater.SimpleSmoothToC02D {
    onGrid = grid_back_2d,
    basis = basis_2d,
+   polyOrder = polyOrder,
 }
 
 multiply4dCalc = Updater.FieldArithmeticUpdater4D {

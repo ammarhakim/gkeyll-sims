@@ -70,7 +70,7 @@ PL_ION, PU_ION = -6.0*ionMass*vtIon, 6.0*ionMass*vtIon
 -- parameters to control time-stepping
 tStart = 0.0
 tEnd = 350e-6
-nFrames = 5
+nFrames = 9
 
 -- A generic function to run an updater.
 function runUpdater(updater, currTime, timeStep, inpFlds, outFlds)
@@ -811,10 +811,10 @@ aTimesPIon = DataStruct.Field2D {
 }
 
 -- Updater to compute A(x)*A(x) on same basis functions as A(x) (DG field)
-aSquaredCalc = Updater.ASquaredProjectionUpdater {
-  onGrid = grid_1d,
-  basis = basis_1d,
-}
+--aSquaredCalc = Updater.ASquaredProjectionUpdater {
+--  onGrid = grid_1d,
+--  basis = basis_1d,
+--}
 -- field to store DG projection of A(x)^2
 aSquared1dDg = DataStruct.Field1D {
    onGrid = grid_1d,
