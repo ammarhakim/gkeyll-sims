@@ -1,4 +1,4 @@
-2x2v GK ETG linear instability cases with R/LT = 4, 6, 8, 10
+2x2v GK ETG linear instability cases with R/LT = 4, 6, 8, 10. kinetic electrons, adiabatic ions.
 
 > pgkyl -f etg4d-rlt4_phi2_ -f etg4d-rlt6_phi2_ -f etg4d-rlt8_phi2_ -f etg4d-rlt10_phi2_ growth log plot -f0
 fitGrowth: fitting region 100 -> 383

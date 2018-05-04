@@ -1,5 +1,4 @@
--- 4D GK ETG linear instability calculation
--- using 'pgkyl -f etg4d-rlt10_phi2_ growth' should give growth rate ~ 7.3e6 
+-- 4D GK ETG nonlinear calculation
 --
 -- Plasma ------------------------------------------------------------------------
 local Plasma = require "App.PlasmaOnCartGrid"
@@ -26,10 +25,10 @@ omega_ce = math.abs(qe*B0/me)
 rho_s   = c_s/omega_ci
 rho_e   = vte/omega_ce
 deltaR  = 32*rho_e
-L_T     = R/10
+L_T     = R/4
 ky_min  = 2*math.pi/deltaR
 -- velocity grid parameters
-N_VPAR, N_MU = 16, 8
+N_VPAR, N_MU = 4, 2
 VPAR_UPPER = math.min(4, 2.5*math.sqrt(N_VPAR/4))*vte
 VPAR_LOWER = -VPAR_UPPER
 MU_LOWER = 0
@@ -47,11 +46,11 @@ end
 plasmaApp = Plasma.App {
    logToFile = true,
 
-   tEnd = 1e-6, -- end time
-   nFrame = 1, -- number of output frames
+   tEnd = 2.5e-5, -- end time
+   nFrame = 9, -- number of output frames
    lower = {R, -deltaR/2}, -- configuration space lower left
    upper = {R+deltaR, deltaR/2}, -- configuration space upper right
-   cells = {4, 8}, -- configuration space cells
+   cells = {8, 8}, -- configuration space cells
    basis = "serendipity", -- one of "serendipity" or "maximal-order"
    polyOrder = 1, -- polynomial order
    timeStepper = "rk3", -- one of "rk2" or "rk3"
@@ -80,7 +79,9 @@ plasmaApp = Plasma.App {
       end,
       init = function (t, xn, self)
          local x, y, vpar, mu = xn[1], xn[2], xn[3], xn[4]
-         local perturb = 1e-3*rho_e/L_T*math.cos(ky_min*y)
+         local x0 = R+deltaR/2
+         local sigma = deltaR/4
+         local perturb = 1e-2*rho_e/L_T*math.cos(ky_min*y)*math.exp(-(x-x0)^2/(2*sigma^2))
          return self:Maxwellian(xn, n0*(1+perturb), Te(x))
       end,
       fluctuationBCs = true, -- only apply BCs to fluctuations
