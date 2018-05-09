@@ -16,8 +16,10 @@ B0 = 1.91   -- [T]
 R0 = 1.313  -- [m]
 a  = 0.4701 -- [m]
 n0 = 4.992*10^(19) -- [1/m^3]
+q = 8
 -- derived parameters
 R       = R0 + 0.5*a
+L_parallel = 2*math.pi*R*q
 vte  	= math.sqrt(Te0/me)
 c_s     = math.sqrt(Te0/mi)
 omega_ci = math.abs(qi*B0/mi)
@@ -27,7 +29,7 @@ rho_e   = vte/omega_ce
 deltaR  = 32*rho_e
 L_T     = R/10
 ky_min  = 2*math.pi/deltaR
-kz_min  = 0 
+kz_min  = 2*math.pi/L_parallel
 -- velocity grid parameters
 N_VPAR, N_MU = 16, 8
 VPAR_UPPER = math.min(4, 2.5*math.sqrt(N_VPAR/4))*vte
@@ -50,8 +52,8 @@ plasmaApp = Plasma.App {
    tEnd = 1e-6, -- end time
    nFrame = 9, -- number of output frames
    lower = {R, -deltaR/2, 0}, -- configuration space lower left
-   upper = {R+deltaR, deltaR/2, 1}, -- configuration space upper right
-   cells = {1, 8, 1}, -- configuration space cells
+   upper = {R+deltaR, deltaR/2, L_parallel}, -- configuration space upper right
+   cells = {1, 8, 8}, -- configuration space cells
    basis = "serendipity", -- one of "serendipity" or "maximal-order"
    polyOrder = 1, -- polynomial order
    timeStepper = "rk3", -- one of "rk2" or "rk3"
@@ -86,7 +88,7 @@ plasmaApp = Plasma.App {
       init = {"maxwellian", 
               density = function (t, xn)
                  local x, y, z = xn[1], xn[2], xn[3]
-                 local perturb = 1e-3*rho_e/L_T*math.cos(ky_min*y)
+                 local perturb = 1e-3*rho_e/L_T*math.cos(ky_min*y + kz_min*z)
                  return n0*(1+perturb)
               end,
               temperature = function (t, xn)
@@ -103,7 +105,7 @@ plasmaApp = Plasma.App {
    adiabaticIon = Plasma.AdiabaticSpecies {
       charge = qi,
       mass = mi,
-      temp = Ti0,
+      temp = Ti0, 
       -- initial conditions
       init = function (t, xn)
          return n0
