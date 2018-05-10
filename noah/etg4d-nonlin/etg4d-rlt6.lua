@@ -124,13 +124,6 @@ plasmaApp = Plasma.App {
          local x = xn[1]
          return Bmag(x)
       end,
-
-      -- bcurvY = 1/B*curl(bhat).grad(y)
-      bcurvY = function (t, xn)
-         local x = xn[1]
-         return -1/(B0*R)
-      end,
-
       -- geometry is not time-dependent
       evolve = false,
    },

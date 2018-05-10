@@ -114,6 +114,7 @@ plasmaApp = Plasma.App {
       evolve = true, -- evolve species?
       diagnosticMoments = {"GkDens"}, 
       randomseed = randomseed,
+      bcz = {Plasma.GkSpecies.bcSheath, Plasma.GkSpecies.bcSheath},
    },
 
    -- gyrokinetic ions
@@ -166,6 +167,7 @@ plasmaApp = Plasma.App {
       evolve = true, -- evolve species?
       diagnosticMoments = {"GkDens"}, 
       randomseed = randomseed,
+      bcz = {Plasma.GkSpecies.bcSheath, Plasma.GkSpecies.bcSheath},
    },
 
    -- field solver
@@ -187,12 +189,6 @@ plasmaApp = Plasma.App {
       bmag = function (t, xn)
          local x = xn[1]
          return B0*R/x
-      end,
-
-      -- bcurvY = 1/B*curl(bhat).grad(y)
-      bcurvY = function (t, xn)
-         local x = xn[1]
-         return -1/(B0*R)
       end,
 
       -- geometry is not time-dependent

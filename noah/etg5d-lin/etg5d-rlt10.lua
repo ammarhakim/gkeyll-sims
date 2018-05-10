@@ -37,14 +37,6 @@ VPAR_LOWER = -VPAR_UPPER
 MU_LOWER = 0
 MU_UPPER = math.min(16, 4*math.sqrt(N_MU/2))*me*vte*vte/B0
 
--- background magnetic field profile
-function Bmag(x) 
-   return B0*R/x
-end
--- background electron temperature profile
-function Te(x)
-   return Te0*(1-(x-R)/L_T)
-end
 
 plasmaApp = Plasma.App {
    logToFile = true,
@@ -82,18 +74,18 @@ plasmaApp = Plasma.App {
               end,
               temperature = function (t, xn)
                  local x = xn[1]
-                 return Te(x)
+                 return Te0*(1-(x-R)/L_T)
               end,
              },
       init = {"maxwellian", 
               density = function (t, xn)
                  local x, y, z = xn[1], xn[2], xn[3]
-                 local perturb = 1e-3*rho_e/L_T*math.cos(ky_min*y + kz_min*z)
+                 local perturb = 1e-3*rho_e/L_T*math.cos(ky_min*y)
                  return n0*(1+perturb)
               end,
               temperature = function (t, xn)
                  local x = xn[1]
-                 return Te(x)
+                 return Te0*(1-(x-R)/L_T)
               end,
              },
       fluctuationBCs = true, -- only apply BCs to fluctuations
@@ -105,7 +97,7 @@ plasmaApp = Plasma.App {
    adiabaticIon = Plasma.AdiabaticSpecies {
       charge = qi,
       mass = mi,
-      temp = Ti0, 
+      temp = Ti0,
       -- initial conditions
       init = function (t, xn)
          return n0
@@ -123,15 +115,8 @@ plasmaApp = Plasma.App {
       -- background magnetic field
       bmag = function (t, xn)
          local x = xn[1]
-         return Bmag(x)
+         return B0*R/x
       end,
-
-      -- bcurvY = 1/B*curl(bhat).grad(y)
-      bcurvY = function (t, xn)
-         local x = xn[1]
-         return -1/(B0*R)
-      end,
-
       -- geometry is not time-dependent
       evolve = false,
    },

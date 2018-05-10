@@ -1,5 +1,4 @@
 -- 4D GK ETG nonlinear calculation
--- note: larger boxsize/higher resolution required, so this simulation runs on 48 cores (in ~30 min)
 --
 -- Plasma ------------------------------------------------------------------------
 local Plasma = require "App.PlasmaOnCartGrid"
@@ -25,15 +24,15 @@ omega_ci = math.abs(qi*B0/mi)
 omega_ce = math.abs(qe*B0/me)
 rho_s   = c_s/omega_ci
 rho_e   = vte/omega_ce
-deltaR  = 128*rho_e
+deltaR  = 32*rho_e
 L_T     = R/10
 ky_min  = 2*math.pi/deltaR
 -- velocity grid parameters
-N_VPAR, N_MU = 20, 10
-VPAR_LOWER = -math.sqrt(N_VPAR)*vte
-VPAR_UPPER = math.sqrt(N_VPAR)*vte
+N_VPAR, N_MU = 4, 2
+VPAR_UPPER = math.min(4, 2.5*math.sqrt(N_VPAR/4))*vte
+VPAR_LOWER = -VPAR_UPPER
 MU_LOWER = 0
-MU_UPPER = math.sqrt(N_MU/2)*2*me*vte*vte/B0
+MU_UPPER = math.min(16, 4*math.sqrt(N_MU/2))*me*vte*vte/B0
 
 -- background magnetic field profile
 function Bmag(x) 
@@ -51,14 +50,14 @@ plasmaApp = Plasma.App {
    nFrame = 9, -- number of output frames
    lower = {R, -deltaR/2}, -- configuration space lower left
    upper = {R+deltaR, deltaR/2}, -- configuration space upper right
-   cells = {18, 24}, -- configuration space cells
+   cells = {8, 8}, -- configuration space cells
    basis = "serendipity", -- one of "serendipity" or "maximal-order"
    polyOrder = 1, -- polynomial order
    timeStepper = "rk3", -- one of "rk2" or "rk3"
-   cflFrac = 0.9,
+   cflFrac = 1.0,
 
    -- decomposition for configuration space
-   decompCuts = {6, 8}, -- cuts in each configuration direction
+   decompCuts = {1, 2}, -- cuts in each configuration direction
    useShared = false, -- if to use shared memory
 
    -- boundary conditions for configuration space
@@ -125,13 +124,6 @@ plasmaApp = Plasma.App {
          local x = xn[1]
          return Bmag(x)
       end,
-
-      -- bcurvY = 1/B*curl(bhat).grad(y)
-      bcurvY = function (t, xn)
-         local x = xn[1]
-         return -1/(B0*R)
-      end,
-
       -- geometry is not time-dependent
       evolve = false,
    },
