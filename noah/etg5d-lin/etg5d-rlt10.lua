@@ -80,7 +80,7 @@ plasmaApp = Plasma.App {
       init = {"maxwellian", 
               density = function (t, xn)
                  local x, y, z = xn[1], xn[2], xn[3]
-                 local perturb = 1e-3*rho_e/L_T*math.cos(ky_min*y)
+                 local perturb = 1e-3*rho_e/L_T*math.cos(ky_min*y + kz_min*z)
                  return n0*(1+perturb)
               end,
               temperature = function (t, xn)
