@@ -92,8 +92,8 @@ plasmaApp = Plasma.App {
               density = function (t, xn)
                  local x, y, z, vpar, mu = xn[1], xn[2], xn[3], xn[4], xn[5]
                  local Ls = Lz/4
-                 local c_ss = math.sqrt(5/3*sourceTemperature(t,xn)/mi)
-                 local nPeak = 4*math.sqrt(5)/3*Ls*sourceDensity(t,xn)/c_ss
+                 local c_ss = math.sqrt(5/3*sourceTemperature(t,{x,y,0})/mi)
+                 local nPeak = 4*math.sqrt(5)/3*Ls*sourceDensity(t,{x,y,0})/c_ss
                  local perturb = 1e-3*math.random(-1,1)
                  if math.abs(z) <= Ls then
                     return nPeak*(1+math.sqrt(1-(z/Ls)^2))/2*(1+perturb)
@@ -131,8 +131,8 @@ plasmaApp = Plasma.App {
               density = function (t, xn)
                  local x, y, z = xn[1], xn[2], xn[3]
                  local Ls = Lz/4
-                 local c_ss = math.sqrt(5/3*sourceTemperature(t,xn)/mi)
-                 local nPeak = 4*math.sqrt(5)/3*Ls*sourceDensity(t,xn)/c_ss
+                 local c_ss = math.sqrt(5/3*sourceTemperature(t,{x,y,0})/mi)
+                 local nPeak = 4*math.sqrt(5)/3*Ls*sourceDensity(t,{x,y,0})/c_ss
                  local perturb = 1e-3*math.random(-1,1)
                  if math.abs(z) <= Ls then
                     return nPeak*(1+math.sqrt(1-(z/Ls)^2))/2*(1+perturb)
