@@ -42,7 +42,7 @@ sourceDensity = function (t, xn)
    if math.abs(z) < Lz/4 then
       return S0*math.max(math.exp(-(x-xSource)^2/(2*lambdaSource)^2), sourceFloor)
    else
-      return 0
+      return 1e-10
    end
 end
 sourceTemperature = function (t, xn)
@@ -61,18 +61,18 @@ randomseed = 100000*Mpi.Comm_rank(Mpi.COMM_WORLD)+os.time()
 plasmaApp = Plasma.App {
    logToFile = true,
 
-   tEnd = 1e-3, -- end time
-   nFrame = 4000, -- number of output frames
+   tEnd = 1e-7, -- end time
+   nFrame = 10, -- number of output frames
    lower = {R - Lx/2, -Ly/2, -Lz/2}, -- configuration space lower left
    upper = {R + Lx/2, Ly/2, Lz/2}, -- configuration space upper right
    cells = {18, 36, 10}, -- configuration space cells
    basis = "serendipity", -- one of "serendipity" or "maximal-order"
    polyOrder = 1, -- polynomial order
    timeStepper = "rk3", -- one of "rk2" or "rk3"
-   cflFrac = 1.0,
+   cflFrac = 0.8,
 
    -- decomposition for configuration space
-   decompCuts = {1, 1, 1}, -- cuts in each configuration direction
+   decompCuts = {6, 12, 2}, -- cuts in each configuration direction
    useShared = false, -- if to use shared memory
 
    -- boundary conditions for configuration space
@@ -93,10 +93,10 @@ plasmaApp = Plasma.App {
                  local x, y, z, vpar, mu = xn[1], xn[2], xn[3], xn[4], xn[5]
                  local Ls = Lz/4
                  local c_ss = math.sqrt(5/3*sourceTemperature(t,xn)/mi)
-                 local nPeak = 4*math.sqrt(5)/3*(Ls/2)*sourceDensity(t,xn)/c_ss
+                 local nPeak = 4*math.sqrt(5)/3*Ls*sourceDensity(t,xn)/c_ss
                  local perturb = 1e-3*math.random(-1,1)
                  if math.abs(z) <= Ls then
-                    return nPeak*(1+math.sqrt(1-z^2/(Ls/2)^2))/2*(1+perturb)
+                    return nPeak*(1+math.sqrt(1-(z/Ls)^2))/2*(1+perturb)
                  else
                     return nPeak/2*(1+perturb)
                  end
@@ -112,7 +112,7 @@ plasmaApp = Plasma.App {
              },
       source = {"maxwellian", density = sourceDensity, temperature = sourceTemperature},
       evolve = true, -- evolve species?
-      diagnosticMoments = {"GkDens"}, 
+      diagnosticMoments = {"GkM0"}, 
       randomseed = randomseed,
       bcz = {Plasma.GkSpecies.bcSheath, Plasma.GkSpecies.bcSheath},
    },
@@ -132,10 +132,10 @@ plasmaApp = Plasma.App {
                  local x, y, z = xn[1], xn[2], xn[3]
                  local Ls = Lz/4
                  local c_ss = math.sqrt(5/3*sourceTemperature(t,xn)/mi)
-                 local nPeak = 4*math.sqrt(5)/3*(Ls/2)*sourceDensity(t,xn)/c_ss
+                 local nPeak = 4*math.sqrt(5)/3*Ls*sourceDensity(t,xn)/c_ss
                  local perturb = 1e-3*math.random(-1,1)
                  if math.abs(z) <= Ls then
-                    return nPeak*(1+math.sqrt(1-z^2/(Ls/2)^2))/2*(1+perturb)
+                    return nPeak*(1+math.sqrt(1-(z/Ls)^2))/2*(1+perturb)
                  else
                     return nPeak/2*(1+perturb)
                  end
@@ -165,14 +165,13 @@ plasmaApp = Plasma.App {
              },
       source = {"maxwellian", density = sourceDensity, temperature = sourceTemperature},
       evolve = true, -- evolve species?
-      diagnosticMoments = {"GkDens"}, 
+      diagnosticMoments = {"GkM0"}, 
       randomseed = randomseed,
       bcz = {Plasma.GkSpecies.bcSheath, Plasma.GkSpecies.bcSheath},
    },
 
    -- field solver
    field = Plasma.GkField {
-      polarizationWeight = mi*n0/B0^2,
       -- dirichlet in x
       phiBcLeft = { T ="D", V = 0.0},
       phiBcRight = { T ="D", V = 0.0},
