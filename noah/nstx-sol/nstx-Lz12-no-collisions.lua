@@ -1,4 +1,4 @@
--- Attempt to reproduce Eric Shi's NSTX SOL case, Lz = 12
+-- Attempt to reproduce Eric Shi's NSTX SOL case, Lz = 12 (test150)
 --
 -- Plasma ------------------------------------------------------------------------
 local Plasma = require "App.PlasmaOnCartGrid"
@@ -40,7 +40,7 @@ sourceDensity = function (t, xn)
    local x, y, z = xn[1], xn[2], xn[3]
    local sourceFloor = 0.1
    if math.abs(z) < Lz/4 then
-      return S0*math.max(math.exp(-(x-xSource)^2/(2*lambdaSource)^2), sourceFloor)
+      return .90625*S0*math.max(math.exp(-(x-xSource)^2/(2*lambdaSource)^2), sourceFloor)
    else
       return 1e-10
    end
@@ -61,8 +61,8 @@ randomseed = 100000*Mpi.Comm_rank(Mpi.COMM_WORLD)+os.time()
 plasmaApp = Plasma.App {
    logToFile = true,
 
-   tEnd = 1e-7, -- end time
-   nFrame = 10, -- number of output frames
+   tEnd = 1e-6, -- end time
+   nFrame = 9, -- number of output frames
    lower = {R - Lx/2, -Ly/2, -Lz/2}, -- configuration space lower left
    upper = {R + Lx/2, Ly/2, Lz/2}, -- configuration space upper right
    cells = {18, 36, 10}, -- configuration space cells
@@ -84,7 +84,7 @@ plasmaApp = Plasma.App {
       mass = me,
       -- velocity space grid
       lower = {-4*vte, 0},
-      upper = {4*vte, 3*me*vte^2/(2*B0)},
+      upper = {4*vte, 12*me*vte^2/(2*B0)},
       cells = {10, 5},
       decompCuts = {1, 1},
       -- initial conditions
@@ -92,8 +92,9 @@ plasmaApp = Plasma.App {
               density = function (t, xn)
                  local x, y, z, vpar, mu = xn[1], xn[2], xn[3], xn[4], xn[5]
                  local Ls = Lz/4
+                 local effectiveSource = sourceDensity(t,{x,y,0})
                  local c_ss = math.sqrt(5/3*sourceTemperature(t,{x,y,0})/mi)
-                 local nPeak = 4*math.sqrt(5)/3*Ls*sourceDensity(t,{x,y,0})/c_ss
+                 local nPeak = 4*math.sqrt(5)/3/c_ss*Ls*effectiveSource/2
                  local perturb = 1e-3*math.random(-1,1)
                  if math.abs(z) <= Ls then
                     return nPeak*(1+math.sqrt(1-(z/Ls)^2))/2*(1+perturb)
@@ -112,8 +113,9 @@ plasmaApp = Plasma.App {
              },
       source = {"maxwellian", density = sourceDensity, temperature = sourceTemperature},
       evolve = true, -- evolve species?
-      diagnosticMoments = {"GkM0"}, 
+      diagnosticMoments = {"GkM0", "GkM1"}, 
       randomseed = randomseed,
+      bcx = {Plasma.GkSpecies.bcZeroFlux, Plasma.GkSpecies.bcZeroFlux},
       bcz = {Plasma.GkSpecies.bcSheath, Plasma.GkSpecies.bcSheath},
    },
 
@@ -123,7 +125,7 @@ plasmaApp = Plasma.App {
       mass = mi,
       -- velocity space grid
       lower = {-4*vti, 0},
-      upper = {4*vti, 3*mi*vti^2/(2*B0)},
+      upper = {4*vti, 12*mi*vti^2/(2*B0)},
       cells = {10, 5},
       decompCuts = {1, 1},
       -- initial conditions
@@ -131,8 +133,9 @@ plasmaApp = Plasma.App {
               density = function (t, xn)
                  local x, y, z = xn[1], xn[2], xn[3]
                  local Ls = Lz/4
+                 local effectiveSource = sourceDensity(t,{x,y,0})
                  local c_ss = math.sqrt(5/3*sourceTemperature(t,{x,y,0})/mi)
-                 local nPeak = 4*math.sqrt(5)/3*Ls*sourceDensity(t,{x,y,0})/c_ss
+                 local nPeak = 4*math.sqrt(5)/3/c_ss*Ls*effectiveSource/2
                  local perturb = 1e-3*math.random(-1,1)
                  if math.abs(z) <= Ls then
                     return nPeak*(1+math.sqrt(1-(z/Ls)^2))/2*(1+perturb)
@@ -165,8 +168,9 @@ plasmaApp = Plasma.App {
              },
       source = {"maxwellian", density = sourceDensity, temperature = sourceTemperature},
       evolve = true, -- evolve species?
-      diagnosticMoments = {"GkM0"}, 
+      diagnosticMoments = {"GkM0", "GkM1"}, 
       randomseed = randomseed,
+      bcx = {Plasma.GkSpecies.bcZeroFlux, Plasma.GkSpecies.bcZeroFlux},
       bcz = {Plasma.GkSpecies.bcSheath, Plasma.GkSpecies.bcSheath},
    },
 
