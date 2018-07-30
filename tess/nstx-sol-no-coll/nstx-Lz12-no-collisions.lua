@@ -6,7 +6,6 @@ local Constants = require "Lib.Constants"
 local Mpi = require "Comm.Mpi"
 
 -- physical parameters
-eps0 = Constants.EPSILON0
 eV = Constants.ELEMENTARY_CHARGE
 qe = -eV
 qi = eV
@@ -24,16 +23,6 @@ P_SOL = 8.1e5 -- [W]
 S0 = 5.7691e23
 xSource = R - 0.05 -- [m], source start coordinate
 lambdaSource = 0.005 -- [m], characteristic length scale of density and temperature
--- collision parameters 
-logLambdaElc = 6.6 - 0.5*math.log(n0/1e20) + 1.5*math.log(Te0/eV)
-print("logLambdaElc = ", logLambdaElc)
-nuElc     = logLambdaElc*eV^4*n0/(6*math.sqrt(2)*math.pi^(3/2)*eps0^2*math.sqrt(me)*(Te0)^(3/2))  --collision freq
-print("nuElc = ", nuElc)
-
-logLambdaIon = 6.6 - 0.5*math.log(n0/1e20) + 1.5*math.log(Ti0/eV)
-print("logLambdaIon = ", logLambdaIon)
-nuIon     = logLambdaIon*eV^4*n0/(12*math.pi^(3/2)*eps0^2*math.sqrt(mi)*(Ti0)^(3/2))
-print("nIon = ", nuIon)
 -- derived parameters
 vti     = math.sqrt(Ti0/mi)
 vte  	= math.sqrt(Te0/me)
@@ -76,17 +65,16 @@ plasmaApp = Plasma.App {
    nFrame = 9, -- number of output frames
    lower = {R - Lx/2, -Ly/2, -Lz/2}, -- configuration space lower left
    upper = {R + Lx/2, Ly/2, Lz/2}, -- configuration space upper right
-   cells = {24, 48, 16}, -- configuration space cells
+   cells = {24, 48, 10}, -- configuration space cells
    basis = "serendipity", -- one of "serendipity" or "maximal-order"
    polyOrder = 1, -- polynomial order
    timeStepper = "rk3", -- one of "rk2" or "rk3"
    cflFrac = 0.4,
 
    -- decomposition for configuration space
-   decompCuts = {6, 16, 2}, -- cuts in each configuration direction
-   --decompCuts = {6, 8, 1}, -- for use in idev
+   decompCuts = {24, 24, 2}, -- cuts in each configuration direction
    useShared = false, -- if to use shared memory
-     
+
    -- boundary conditions for configuration space
    periodicDirs = {2}, -- periodic in y only
 
@@ -122,10 +110,7 @@ plasmaApp = Plasma.App {
                     return 20*eV
                  end
               end,
-      },
-      coll = Plasma.GkLBOCollisions {
-      	 collFreq = nuElc,
-      },
+             },
       source = {"maxwellian", density = sourceDensity, temperature = sourceTemperature},
       evolve = true, -- evolve species?
       diagnosticMoments = {"GkM0", "GkM1"}, 
@@ -180,10 +165,7 @@ plasmaApp = Plasma.App {
                    return z/math.abs(z)*math.sqrt(Te/mi)
                  end
               end,
-      },
-      coll = Plasma.GkLBOCollisions {
-      	 collFreq = nuIon,
-      },
+             },
       source = {"maxwellian", density = sourceDensity, temperature = sourceTemperature},
       evolve = true, -- evolve species?
       diagnosticMoments = {"GkM0", "GkM1"}, 
