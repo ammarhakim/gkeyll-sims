@@ -62,7 +62,7 @@ plasmaApp = Plasma.App {
    cflFrac = 1.0,
 
    -- decomposition for configuration space
-   decompCuts = {2,2}, -- cuts in each configuration direction
+   decompCuts = {4,4}, -- cuts in each configuration direction
    useShared = false, -- if to use shared memory
 
    -- boundary conditions for configuration space
