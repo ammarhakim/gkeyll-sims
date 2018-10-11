@@ -40,8 +40,8 @@ plasmaApp = Plasma.App {
       charge = -1.0,
       mass = 1.0,
       -- velocity space grid
-      lower = {-8.0},
-      upper = {8.0},
+      lower = {-10.0},
+      upper = {10.0},
       cells = {64},
       decompCuts = {1},
       -- initial conditions
