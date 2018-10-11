@@ -61,7 +61,7 @@ for beta in [0.1, 1.0, 10.0]:
         plt.plot(kperps, freqs, "ok")
 
 plt.xscale("log")
-plt.ylim(top=4)
+plt.ylim(0,4)
 plt.legend(loc="upper right")
 plt.xlabel(r"$k_\perp \rho_s$")
 plt.ylabel(r"$\omega/k_\parallel v_{te}$")
