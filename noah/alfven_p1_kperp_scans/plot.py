@@ -65,5 +65,5 @@ plt.legend()
 plt.xlabel(r"$k_\perp \rho_s$")
 plt.ylabel(r"$\omega/k_\parallel v_{te}$")
 
-plt.show()
 plt.savefig("alfven-kperp-scans.png")
+plt.show()
